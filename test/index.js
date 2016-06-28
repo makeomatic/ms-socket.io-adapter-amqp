@@ -1,15 +1,11 @@
 const { expect } = require('chai');
+const adapter = require('../src');
 const Errors = require('common-errors');
 const http = require('http').Server;
 const SocketIO = require('socket.io');
 const SocketIOClient = require('socket.io-client');
 
-
-var redis = require('redis').createClient;
-var adapter = require('../src/adapter');
-
 describe('socket.io-adapter-amqp', function suite() {
-  this.timeout(1000 * 60 * 10);
   describe('constructor', function suite() {
     it('should throw error when trying to instance with invalid options', function test() {
       expect(() => adapter()).to.not.throw();
@@ -116,12 +112,16 @@ describe('socket.io-adapter-amqp', function suite() {
         server.on('connection', function(c){
           c.join('woot');
           c.on('disconnect', function() {
-            expect(c.adapter.sids[c.id]).to.be.empty();
-            expect(c.adapter.rooms).to.be.empty();
+            expect(c.adapter.sids[c.id]).to.be.empty;
+            expect(c.adapter.rooms).to.be.empty;
             client.disconnect();
             done();
           });
-          c.disconnect();
+
+          setTimeout(() => {
+            c.disconnect();
+          }, 1000);
+
         });
       });
     });

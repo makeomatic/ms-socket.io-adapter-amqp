@@ -1,6 +1,5 @@
-const Adapter = require('socket.io-adapter');
+const MemoryAdapter = require('socket.io-adapter');
 const AMQPTransport = require('ms-amqp-transport');
-const async = require('async');
 const debug = require('debug')('socket.io-adapter-amqp');
 const Errors = require('common-errors');
 const is = require('is');
@@ -17,16 +16,17 @@ const defaultTransportOptions = {
   defaultQueueOpts: {
     autoDelete: true,
     exclusive: true,
-  }
+  },
 };
+const ROUTING_KEY_DELIMITER = '.';
 
 /**
  * @param {Object} transportOptions
  * @returns {AMQPAdapter}
  */
-function adapter(transportOptions = {}) {
+function Adapter(transportOptions = {}) {
   if (is.object(transportOptions) === false) {
-    throw Errors.ArgumentError('transportOptions');
+    throw new Errors.ArgumentError('transportOptions');
   }
 
   let queue = null;
@@ -36,13 +36,6 @@ function adapter(transportOptions = {}) {
   const serverId = uid2(6);
   debug('#%s: create adapter', serverId);
 
-  const transport = new AMQPTransport(Object.assign({}, transportOptions, defaultTransportOptions));
-  transport.on('consumed-queue-reconnected', (consumer, createdQueue) => {
-    debug('#%s: fired reconnected event', serverId);
-    queue = createdQueue;
-  });
-  transport.connect().then(transport => transport.createConsumedQueue(router));
-
   /**
    * @param message
    * @param headers
@@ -51,8 +44,8 @@ function adapter(transportOptions = {}) {
     const routingKey = headers.routingKey;
     debug('#%s: get message for', serverId, routingKey);
 
-    // expected that routingKey should be following pattern {namespace}#[{room}]
-    const routingParts = routingKey.split('#');
+    // expected that routingKey should be following pattern {namespace}.[{room}]
+    const routingParts = routingKey.split(ROUTING_KEY_DELIMITER);
 
     if (routingParts.length < 1) {
       return debug('#%s: invalid routing key %s', serverId, routingKey);
@@ -65,8 +58,15 @@ function adapter(transportOptions = {}) {
       return debug('#%s: invalid adapter for routing key %s', serverId, routingKey);
     }
 
-    adapter.processMessage(routingKey, message);
+    return adapter.processMessage(routingKey, message);
   }
+
+  const transport = new AMQPTransport(Object.assign({}, transportOptions, defaultTransportOptions));
+  transport.on('consumed-queue-reconnected', (consumer, createdQueue) => {
+    debug('#%s: fired reconnected event', serverId);
+    queue = createdQueue;
+  });
+  transport.connect().then(() => transport.createConsumedQueue(router));
 
   /**
    * @param routingKey
@@ -74,14 +74,15 @@ function adapter(transportOptions = {}) {
   function bindRoutingKey(routingKey) {
     if (queue === null) {
       debug('#%s: trying to bind routing key %s, but queue is not ready yet', serverId, routingKey);
-      return Promise.delay(100).then(bindRoutingKey.bind(null, routingKey));
+      return Promise.delay(100).return(routingKey).then(bindRoutingKey);
     }
 
     return transport.bindExchange(queue, routingKey)
       .tap(() => {
         debug('#%s: routing key %s is binded', serverId, routingKey);
         exchangeCreated = true;
-      });
+      })
+      .return(true);
   }
 
   /**
@@ -89,12 +90,13 @@ function adapter(transportOptions = {}) {
    */
   function unbindRoutingKey(routingKey) {
     if (queue === null) {
-      debug('#%s: trying to unbind routing key %s, but queue is not ready yet', serverId, routingKey);
-      return Promise.delay(100).then(unbindRoutingKey.bind(null, routingKey));
+      debug('#%s: trying to unbind routing key %s, but queue is not ready', serverId, routingKey);
+      return Promise.delay(100).return(routingKey).then(unbindRoutingKey);
     }
 
     return transport.unbindExchange(queue, routingKey)
-      .tap(() => debug('#%s: routing key %s is unbinded', serverId, routingKey));
+      .tap(() => debug('#%s: routing key %s is unbinded', serverId, routingKey))
+      .return(true);
   }
 
   /**
@@ -104,162 +106,197 @@ function adapter(transportOptions = {}) {
   function publish(routingKey, message) {
     if (exchangeCreated === false) {
       debug('#%s: trying to publish to %s, but exchange is not ready yet', serverId, routingKey);
-      return Promise.delay(100).then(publish.bind(null, routingKey, message));
+      return Promise.delay(100).return([routingKey, message]).spread(publish);
     }
 
     return transport.publish(routingKey, message)
-      .tap(() => debug('#%s: publish to %s', serverId, routingKey));
+      .tap(() => debug('#%s: publish to %s', serverId, routingKey))
+      .return(true);
   }
 
   /**
-   * @param {Namespace} namespace
-   */
-  function AMQPAdapter(namespace) {
-    if (namespace instanceof Namespace === false) {
-      throw Errors.ArgumentError('namespace');
-    }
-
-    Adapter.call(this, namespace);
-    this.routingKey = `${namespace.name}#`;
-    bindRoutingKey(this.routingKey);
-    adapters.set(namespace.name, this);
-    debug('#%s: namespace %s was created', serverId, namespace.name);
-  }
-
-  AMQPAdapter.prototype.__proto__ = Adapter.prototype;
-
-  /**
-   * @param {Object} packet
-   * @param {Object} options
-   * @param {Boolean} fromAnotherNode
-   */
-  AMQPAdapter.prototype.broadcast = function broadcast(packet, options, fromAnotherNode = false) {
-    Adapter.prototype.broadcast.call(this, packet, options);
-
-    // if broadcasting from local node, need to broadcast to another nodes
-    // else means that message came from amqp and already broadcasted
-    if (fromAnotherNode === false) {
-      const routingKey = `${packet.nsp}#`;
-      const message = [serverId, packet, options];
-
-      if (options.rooms) {
-        options.rooms.forEach(room => publish(`${routingKey}${room}#`, message));
-      } else {
-          publish(routingKey, message)
-      }
-    }
-  };
-
-  /**
-   * @param {string} routingKey
-   * @param {Buffer} message
+   * @param {Array} parts
    * @returns {*}
    */
-  AMQPAdapter.prototype.processMessage = function processMessage(routingKey, message) {
-    if (routingKey.startsWith(this.routingKey) === false) {
-      debug('#%s: ignore different routing keys %s and %s', serverId, routingKey, this.routingKey);
-      return;
+  function makeRoutingKey(...parts) {
+    parts.forEach(part => {
+      if (is.string(part) === false) {
+        throw new Errors.ArgumentError('part');
+      }
+    });
+
+    return parts.join(ROUTING_KEY_DELIMITER);
+  }
+
+  class AMQPAdapter extends MemoryAdapter {
+    /**
+     * @param {Namespace} namespace
+     */
+    constructor(namespace) {
+      if (namespace instanceof Namespace === false) {
+        throw new Errors.ArgumentError('namespace');
+      }
+
+      super(namespace);
+      this.routingKey = makeRoutingKey(namespace.name);
+      bindRoutingKey(this.routingKey);
+      adapters.set(namespace.name, this);
+      debug('#%s: namespace %s was created', serverId, namespace.name);
     }
 
-    const args = message;
-    const messageServerId = args.shift();
-    let packet;
+    broadcast(packet, options, fromAnotherNode = false) {
+      super.broadcast(packet, options);
 
-    if (messageServerId === serverId) {
-      return debug('#%s: ignore same server id %s', serverId, messageServerId);
+      // if broadcasting from local node, need to broadcast to another nodes
+      // else means that message came from amqp and already broadcasted
+      if (fromAnotherNode === false) {
+        const routingKey = makeRoutingKey(packet.nsp);
+        const message = [serverId, packet, options];
+
+        if (options.rooms) {
+          const promises = options.rooms
+            .map(room => publish(makeRoutingKey(routingKey, room), message));
+
+          return Promise.all(promises);
+        }
+
+        return publish(routingKey, message);
+      }
+
+      return Promise.resolve(true);
     }
 
-    packet = args[0];
+    processMessage(routingKey, message) {
+      if (routingKey.startsWith(this.routingKey) === false) {
+        debug(
+          '#%s: ignore different routing keys %s and %s',
+          serverId,
+          routingKey,
+          this.routingKey
+        );
+        return Promise.resolve(true);
+      }
 
-    if (packet && packet.nsp === undefined) {
-      packet.nsp = '/';
+      const args = message;
+      const messageServerId = args.shift();
+
+      if (messageServerId === serverId) {
+        debug('#%s: ignore same server id %s', serverId, messageServerId);
+        Promise.resolve(true);
+      }
+
+      const packet = args[0];
+
+      if (packet && packet.nsp === undefined) {
+        packet.nsp = '/';
+      }
+
+      if (!packet || packet.nsp !== this.nsp.name) {
+        return debug('#%s: ignore different namespace', serverId);
+      }
+
+      args.push(true);
+
+      return this.broadcast(...args);
     }
 
-    if (!packet || packet.nsp !== this.nsp.name) {
-      return debug('#%s: ignore different namespace', serverId);
-    }
+    /**
+     * Subscribe client to room messages
+     *
+     * @param {String} id
+     * @param {String} room
+     * @param {Function} callback
+     */
+    add(id, room, callback) {
+      debug('#%s: adding %s to %s ', serverId, id, room);
+      super.add(id, room);
 
-    args.push(true);
-
-    this.broadcast.apply(this, args);
-  };
-
-
-  /**
-   * Subscribe client to room messages
-   *
-   * @param {String} id
-   * @param {String} room
-   * @param {Function} callback
-   */
-  AMQPAdapter.prototype.add = function add(id, room, callback) {
-    debug('#%s: adding %s to %s ', serverId, id, room);
-    Adapter.prototype.add.call(this, id, room);
-    const routingKey = `${this.nsp.name}#${room}#`;
-    bindRoutingKey(routingKey)
-      .tap(() => callback && callback(null))
-      .catch(error => {
-        this.emit('error', error);
-        callback && callback(error);
-      });
-  };
-
-  /**
-   * Unsubscribe client from room messages.
-   *
-   * @param {String} id
-   * @param {String} room
-   * @param {Function} callback
-   */
-  AMQPAdapter.prototype.del = function(id, room, callback){
-    debug('#%s: removing %s from %s', serverId, id, room);
-    const hasRoom = this.rooms.hasOwnProperty(room);
-    Adapter.prototype.del.call(this, id, room);
-
-    if (hasRoom && !this.rooms[room]) {
-      const routingKey = `${this.nsp.name}#${room}#`;
-      unbindRoutingKey(routingKey)
+      return bindRoutingKey(makeRoutingKey(this.nsp.name, room))
         .tap(() => callback && callback(null))
+        .return(true)
         .catch(error => {
           this.emit('error', error);
-          callback && callback(error);
+
+          if (callback) {
+            callback(error);
+          }
         });
-    } else {
-      callback && process.nextTick(callback.bind(null, null));
-    }
-  };
-
-  /**
-   * Unsubscribe client completely
-   *
-   * @param {String} id
-   * @param {Function} callback
-   */
-  AMQPAdapter.prototype.delAll = function(id, callback) {
-    debug('#%s: removing %s from all rooms', serverId, id);
-
-    const rooms = this.sids[id];
-    const adapter = this;
-
-    if (!rooms) {
-      if (fn) process.nextTick(callback.bind(null, null));
-      return;
     }
 
-    async.forEach(Object.keys(rooms), function(room, next){
-      adapter.del(id, room, next);
-    }, function(error){
-      if (error) {
-        adapter.emit('error', error);
-        callback && callback(error);
-        return;
+    /**
+     * Unsubscribe client from room messages.
+     *
+     * @param {String} id
+     * @param {String} room
+     * @param {Function} callback
+     */
+    del(id, room, callback) {
+      debug('#%s: removing %s from %s', serverId, id, room);
+      const hasRoom = this.rooms.hasOwnProperty(room);
+      super.del(id, room);
+
+      if (hasRoom && !this.rooms[room]) {
+        return unbindRoutingKey(makeRoutingKey(this.nsp.name, room))
+          .tap(() => callback && callback(null))
+          .return(true)
+          .catch(error => {
+            this.emit('error', error);
+
+            if (callback) {
+              callback(error);
+            }
+          });
       }
-      delete adapter.sids[id];
-      callback && callback(null);
-    });
-  };
+
+      if (callback) {
+        process.nextTick(callback.bind(null, null));
+      }
+
+      return Promise.resolve(true);
+    }
+
+    /**
+     * Unsubscribe client completely
+     *
+     * @param {String} id
+     * @param {Function} callback
+     */
+    delAll(id, callback) {
+      debug('#%s: removing %s from all rooms', serverId, id);
+
+      const rooms = this.sids[id];
+      const adapter = this;
+
+      if (!rooms) {
+        if (callback) {
+          process.nextTick(callback.bind(null, null));
+        }
+
+        return Promise.resolve(true);
+      }
+
+      const promises = Object.keys(rooms).map(room => adapter.del(id, room));
+
+      return Promise.all(promises)
+        .tap(() => {
+          delete adapter.sids[id];
+
+          if (callback) {
+            callback(null);
+          }
+        })
+        .return(true)
+        .catch(error => {
+          adapter.emit('error', error);
+
+          if (callback) {
+            callback(error);
+          }
+        });
+    }
+  }
 
   return AMQPAdapter;
 }
 
-module.exports = adapter;
+module.exports = Adapter;

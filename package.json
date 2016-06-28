@@ -1,33 +1,39 @@
 {
   "name": "ms-socket.io-adapter-amqp",
-  "version": "1.0.0",
   "description": "Socket.io adapter for amqp using 'ms-transport-amqp'",
+  "main": "./lib/index.js",
+  "license": "MIT",
   "repository": {
     "type": "git",
-    "url": ""
+    "url": "git@github.com:makeomatic/ms-socket.io-adapter-amqp.git"
   },
   "scripts": {
-    "test": "mocha"
+    "compile": "babel -d ./lib ./src",
+    "lint": "eslint ./src",
+    "prepublish": "npm run lint && npm run compile",
+    "semantic-release": "semantic-release pre && npm publish && semantic-release post",
+    "test": "npm run lint && mocha"
   },
   "dependencies": {
-    "async": "^1.5.2",
-    "chai": "^3.5.0",
+    "bluebird": "^3.4.1",
     "common-errors": "^0.5.7",
     "debug": "2.2.0",
     "is": "^3.1.0",
-    "lodash": "^4.13.1",
-    "ms-amqp-transport": "../ms-amqp-transport",
-    "msgpack-js": "0.3.0",
-    "redis": "2.4.2",
+    "ms-amqp-transport": "^3.0.0",
     "socket.io-adapter": "0.4.0",
     "uid2": "0.0.3"
   },
   "devDependencies": {
+    "babel-cli": "^6.7.7",
+    "babel-eslint": "^6.0.4",
+    "babel-plugin-transform-es2015-destructuring": "^6.9.0",
+    "babel-plugin-transform-strict-mode": "^6.6.5",
+    "chai": "^3.5.0",
+    "eslint": "^2.11.1",
+    "eslint-config-airbnb-base": "^3.0.0",
+    "eslint-plugin-import": "^1.6.1",
     "mocha": "^2.5.3",
     "socket.io": "^1.4.8",
     "socket.io-client": "^1.4.8"
-  },
-  "peerDependencies": {
-    "lodash": "4.x.x"
   }
 }
