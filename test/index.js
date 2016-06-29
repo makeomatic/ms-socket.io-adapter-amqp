@@ -73,8 +73,6 @@ describe('socket.io-adapter-amqp', function suite() {
       });
     });
 
-    this.timeout(1000000)
-
     it('doesn\'t broadcast to left rooms', function(done) {
       create(function(server1, client1) {
         create(function(server2, client2) {

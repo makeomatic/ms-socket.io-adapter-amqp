@@ -211,16 +211,17 @@ function Adapter(transportOptions = {}) {
       debug('#%s: adding %s to %s ', serverId, id, room);
       super.add(id, room);
 
-      return bindRoutingKey(makeRoutingKey(this.nsp.name, room))
-        .tap(() => callback && callback(null))
+      const promise = bindRoutingKey(makeRoutingKey(this.nsp.name, room))
         .return(true)
         .catch(error => {
           this.emit('error', error);
-
-          if (callback) {
-            callback(error);
-          }
         });
+
+      if (is.fn(callback)) {
+        return promise.asCallback(callback);
+      }
+
+      return promise;
     }
 
     /**
@@ -233,26 +234,24 @@ function Adapter(transportOptions = {}) {
     del(id, room, callback) {
       debug('#%s: removing %s from %s', serverId, id, room);
       const hasRoom = this.rooms.hasOwnProperty(room);
+      let promise;
       super.del(id, room);
 
       if (hasRoom && !this.rooms[room]) {
-        //return unbindRoutingKey(makeRoutingKey(this.nsp.name, room))
-        //  .tap(() => callback && callback(null))
-        //  .return(true)
-        //  .catch(error => {
-        //    this.emit('error', error);
-        //
-        //    if (callback) {
-        //      callback(error);
-        //    }
-        //  });
+        promise = unbindRoutingKey(makeRoutingKey(this.nsp.name, room))
+          .return(true)
+          .catch(error => {
+            this.emit('error', error);
+          });
+      } else {
+        promise = Promise.resolve(true);
       }
 
-      if (callback) {
-        process.nextTick(callback.bind(null, null));
+      if (is.fn(callback)) {
+        return promise.asCallback(callback);
       }
 
-      return Promise.resolve(true);
+      return promise;
     }
 
     /**
@@ -264,35 +263,27 @@ function Adapter(transportOptions = {}) {
     delAll(id, callback) {
       debug('#%s: removing %s from all rooms', serverId, id);
 
-      const rooms = this.sids[id];
       const adapter = this;
+      const rooms = adapter.sids[id];
+      let promise;
 
-      if (!rooms) {
-        if (callback) {
-          process.nextTick(callback.bind(null, null));
-        }
-
-        return Promise.resolve(true);
+      if (rooms) {
+        const promises = Object.keys(rooms).map(room => adapter.del(id, room));
+        promise = Promise.all(promises)
+          .tap(() => delete adapter.sids[id])
+          .return(true)
+          .catch(error => {
+            adapter.emit('error', error);
+          });
+      } else {
+        promise = Promise.resolve(true);
       }
 
-      const promises = Object.keys(rooms).map(room => adapter.del(id, room));
+      if (is.fn(callback)) {
+        return promise.asCallback(callback);
+      }
 
-      return Promise.all(promises)
-        .tap(() => {
-          delete adapter.sids[id];
-
-          if (callback) {
-            callback(null);
-          }
-        })
-        .return(true)
-        .catch(error => {
-          adapter.emit('error', error);
-
-          if (callback) {
-            callback(error);
-          }
-        });
+      return promise;
     }
   }
 
