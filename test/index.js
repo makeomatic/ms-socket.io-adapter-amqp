@@ -73,30 +73,38 @@ describe('socket.io-adapter-amqp', function suite() {
       });
     });
 
+    this.timeout(1000000)
+
     it('doesn\'t broadcast to left rooms', function(done) {
-      create(function(server1, client1){
-        create(function(server2, client2){
+      create(function(server1, client1) {
+        create(function(server2, client2) {
           create(function(server3, client3){
-            server1.on('connection', function(c1){
+            server1.on('connection', function(c1) {
               c1.join('woot');
               c1.leave('woot');
             });
 
-            server2.on('connection', function(c2){
+            server2.on('connection', function(c2) {
               c2.on('do broadcast', function(){
-                c2.broadcast.to('woot').emit('broadcast');
-
                 setTimeout(function() {
-                  client1.disconnect();
-                  client2.disconnect();
-                  client3.disconnect();
-                  done();
-                }, 1000);
+                  c2.broadcast.to('woot').emit('broadcast');
+                }, 500);
               });
             });
 
-            server3.on('connection', function(c3){
-              client2.emit('do broadcast');
+            server3.on('connection', function(c3) {
+              c3.join('woot', () => {
+                client3.on('broadcast', function() {
+                  setTimeout(function() {
+                    client1.disconnect();
+                    client2.disconnect();
+                    client3.disconnect();
+                    done();
+                  }, 500);
+                });
+
+                client2.emit('do broadcast');
+              });
             });
 
             client1.on('broadcast', function(){
@@ -107,9 +115,9 @@ describe('socket.io-adapter-amqp', function suite() {
       });
     });
 
-    it.only('deletes rooms upon disconnection', function(done){
-      create(function(server, client){
-        server.on('connection', function(c){
+    it('deletes rooms upon disconnection', function(done) {
+      create(function(server, client) {
+        server.on('connection', function(c) {
           c.join('woot');
           c.on('disconnect', function() {
             expect(c.adapter.sids[c.id]).to.be.empty;
@@ -121,7 +129,6 @@ describe('socket.io-adapter-amqp', function suite() {
           setTimeout(() => {
             c.disconnect();
           }, 1000);
-
         });
       });
     });

@@ -236,16 +236,16 @@ function Adapter(transportOptions = {}) {
       super.del(id, room);
 
       if (hasRoom && !this.rooms[room]) {
-        return unbindRoutingKey(makeRoutingKey(this.nsp.name, room))
-          .tap(() => callback && callback(null))
-          .return(true)
-          .catch(error => {
-            this.emit('error', error);
-
-            if (callback) {
-              callback(error);
-            }
-          });
+        //return unbindRoutingKey(makeRoutingKey(this.nsp.name, room))
+        //  .tap(() => callback && callback(null))
+        //  .return(true)
+        //  .catch(error => {
+        //    this.emit('error', error);
+        //
+        //    if (callback) {
+        //      callback(error);
+        //    }
+        //  });
       }
 
       if (callback) {
