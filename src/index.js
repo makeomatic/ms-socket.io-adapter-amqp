@@ -1,3 +1,3 @@
-const adapter = require('./adapter');
+const AdapterFactory = require('./factory');
 
-module.exports = adapter;
+module.exports = AdapterFactory;

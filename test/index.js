@@ -1,5 +1,5 @@
 const { expect } = require('chai');
-const adapter = require('../src');
+const AdapterFactory = require('../src');
 const Errors = require('common-errors');
 const http = require('http').Server;
 const SocketIO = require('socket.io');
@@ -8,8 +8,8 @@ const SocketIOClient = require('socket.io-client');
 describe('socket.io-adapter-amqp', function suite() {
   describe('constructor', function suite() {
     it('should throw error when trying to instance with invalid options', function test() {
-      expect(() => adapter()).to.not.throw();
-      expect(() => adapter('localhost')).to.throw(Errors.ArgumentError);
+      expect(() => AdapterFactory.fromOptions()).to.not.throw();
+      expect(() => AdapterFactory.fromOptions('localhost')).to.throw(Errors.ArgumentError);
     });
   });
 
@@ -141,7 +141,9 @@ describe('socket.io-adapter-amqp', function suite() {
   function create(callback, namespace = '/chat') {
     const server = http();
     const socketIO = SocketIO(server);
-    socketIO.adapter(new adapter());
+    const adapter = AdapterFactory.fromOptions();
+
+    socketIO.adapter(adapter);
     server.listen(err => {
       if (err) {
         throw err; // abort tests
