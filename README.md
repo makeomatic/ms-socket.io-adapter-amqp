@@ -4,18 +4,18 @@
 
 ```js
 const socketIO = require('socket.io')(3000);
-const AmqpAdapter = require('ms-socket.io-adapter-amqp');
+const AdapterFactory = require('ms-socket.io-adapter-amqp');
 const options = {
   // ms-amqp-transport options e.g.
-  {
-    exchange: 'my-exchange',
-    connection: {
-      host: 'localhost',
-      port: 5672,
-    }
-  }
+  //{
+  //  exchange: 'my-exchange',
+  //  connection: {
+  //    host: 'localhost',
+  //    port: 5672,
+  //  }
+  //}
 };
-socketIO.adapter(new AmqpAdapter(options));
+socketIO.adapter(AdapterFactory.fromOptions(options));
 ```
 
 By running socket.io with the `ms-socket.io-adapter-amqp` adapter 
