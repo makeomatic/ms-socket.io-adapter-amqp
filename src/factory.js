@@ -19,7 +19,7 @@ class AdapterFactory {
 
     const transport = new Transport(options);
 
-    return new this(transport);
+    return new AdapterFactory(transport);
   }
 
   /**
