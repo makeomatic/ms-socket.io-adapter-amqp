@@ -1,6 +1,7 @@
 {
   "plugins": [
-    "transform-strict-mode",
-    "transform-es2015-destructuring"
+    "transform-class-properties",
+    "transform-es2015-destructuring",
+    "transform-strict-mode"
   ]
 }

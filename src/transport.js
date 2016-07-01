@@ -12,26 +12,22 @@ class Transport {
   /**
    * @returns {string}
    */
-  static get ROUTING_KEY_DELIMITER() {
-    return '.';
-  }
+  static ROUTING_KEY_DELIMITER = '.';
 
   /**
    *
    */
-  static get defaultOptions() {
-    return {
-      exchange: 'socket.io-adapter-amqp',
-      exchangeArgs: {
-        autoDelete: true,
-        type: 'direct',
-      },
-      defaultQueueOpts: {
-        autoDelete: true,
-        exclusive: true,
-      },
-    };
-  }
+  static defaultOptions = {
+    exchange: 'socket.io-adapter-amqp',
+    exchangeArgs: {
+      autoDelete: true,
+      type: 'direct',
+    },
+    defaultQueueOpts: {
+      autoDelete: true,
+      exclusive: true,
+    },
+  };
 
   /**
    * @param {Object} options
@@ -44,7 +40,7 @@ class Transport {
     this.adapters = new Map();
     this.exchangeCreated = false;
     this.serverId = uid2(6);
-    this.transport = new AMQPTransport(Object.assign({}, options, this.constructor.defaultOptions));
+    this.transport = new AMQPTransport(Object.assign({}, options, Transport.defaultOptions));
     this.queue = null;
 
     this.transport.on('consumed-queue-reconnected', (consumer, createdQueue) => {
@@ -62,7 +58,7 @@ class Transport {
   router(message, headers) {
     const routingKey = headers.routingKey;
     // expected that routingKey should be following pattern {namespace}.[{room}]
-    const routingParts = routingKey.split(this.constructor.ROUTING_KEY_DELIMITER);
+    const routingParts = routingKey.split(Transport.ROUTING_KEY_DELIMITER);
     debug('#%s: get message for', this.serverId, routingKey);
 
     if (routingParts.length < 1) {
@@ -160,7 +156,7 @@ class Transport {
       }
     });
 
-    return parts.join(this.constructor.ROUTING_KEY_DELIMITER);
+    return parts.join(Transport.ROUTING_KEY_DELIMITER);
   }
 }
 

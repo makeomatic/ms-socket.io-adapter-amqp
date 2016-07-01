@@ -26,14 +26,26 @@
   "devDependencies": {
     "babel-cli": "^6.7.7",
     "babel-eslint": "^6.0.4",
+    "babel-plugin-transform-class-properties": "^6.10.2",
     "babel-plugin-transform-es2015-destructuring": "^6.9.0",
     "babel-plugin-transform-strict-mode": "^6.6.5",
+    "babel-register": "^6.4.3",
     "chai": "^3.5.0",
+    "cz-conventional-changelog": "^1.1.6",
     "eslint": "^2.11.1",
     "eslint-config-airbnb-base": "^3.0.0",
-    "eslint-plugin-import": "^1.6.1",
+    "eslint-plugin-import": "^1.10.0",
     "mocha": "^2.5.3",
+    "semantic-release": "^4.3.5",
     "socket.io": "^1.4.8",
     "socket.io-client": "^1.4.8"
+  },
+  "release": {
+    "verifyConditions": []
+  },
+  "config": {
+    "commitizen": {
+      "path": "./node_modules/cz-conventional-changelog"
+    }
   }
 }

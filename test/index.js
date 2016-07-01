@@ -2,6 +2,7 @@ const { expect } = require('chai');
 const AdapterFactory = require('../src');
 const Errors = require('common-errors');
 const http = require('http').Server;
+const Promise = require('bluebird');
 const SocketIO = require('socket.io');
 const SocketIOClient = require('socket.io-client');
 
@@ -35,23 +36,31 @@ describe('socket.io-adapter-amqp', function suite() {
     });
 
     it('broadcasts to rooms', function(done) {
-      create(function(server1, client1){
-        create(function(server2, client2){
-          create(function(server3, client3){
-            server1.on('connection', function(c1){
-              c1.join('woot');
-            });
+      create(function(server1, client1) {
+        server1.on('connection', function(c1) {
+          c1.join('woot');
+        });
 
-            server2.on('connection', function(c2){
-              // does not join, performs broadcast
-              c2.on('do broadcast', function(){
-                c2.broadcast.to('woot').emit('broadcast');
-              });
+        create(function(server2, client2) {
+          server2.on('connection', function(c2) {
+            // does not join, performs broadcast
+            c2.on('do broadcast', function() {
+              c2.broadcast.to('woot').emit('broadcast');
             });
+          });
 
+          client2.on('broadcast', function(){
+            throw new Error('Not in room');
+          });
+
+          create(function(server3, client3) {
             server3.on('connection', function(c3){
               // does not join, signals broadcast
               client2.emit('do broadcast');
+            });
+
+            client3.on('broadcast', function(){
+              throw new Error('Not in room');
             });
 
             client1.on('broadcast', function(){
@@ -60,14 +69,6 @@ describe('socket.io-adapter-amqp', function suite() {
               client3.disconnect();
               setTimeout(done, 100);
             });
-
-            client2.on('broadcast', function(){
-              throw new Error('Not in room');
-            });
-
-            client3.on('broadcast', function(){
-              throw new Error('Not in room');
-            });
           });
         });
       });
@@ -75,21 +76,25 @@ describe('socket.io-adapter-amqp', function suite() {
 
     it('doesn\'t broadcast to left rooms', function(done) {
       create(function(server1, client1) {
+        server1.on('connection', function(c1) {
+          c1.join('woot');
+          c1.leave('woot');
+        });
+
+        client1.on('broadcast', function(){
+          throw new Error('Not in room');
+        });
+
         create(function(server2, client2) {
-          create(function(server3, client3){
-            server1.on('connection', function(c1) {
-              c1.join('woot');
-              c1.leave('woot');
+          server2.on('connection', function(c2) {
+            c2.on('do broadcast', function(){
+              setTimeout(function() {
+                c2.broadcast.to('woot').emit('broadcast');
+              }, 500);
             });
+          });
 
-            server2.on('connection', function(c2) {
-              c2.on('do broadcast', function(){
-                setTimeout(function() {
-                  c2.broadcast.to('woot').emit('broadcast');
-                }, 500);
-              });
-            });
-
+          create(function(server3, client3) {
             server3.on('connection', function(c3) {
               c3.join('woot', () => {
                 client3.on('broadcast', function() {
@@ -103,10 +108,6 @@ describe('socket.io-adapter-amqp', function suite() {
 
                 client2.emit('do broadcast');
               });
-            });
-
-            client1.on('broadcast', function(){
-              throw new Error('Not in room');
             });
           });
         });
@@ -151,7 +152,11 @@ describe('socket.io-adapter-amqp', function suite() {
 
       const address = server.address();
       const url = 'http://localhost:' + address.port + namespace;
-      callback(socketIO.of(namespace), SocketIOClient(url));
+      const serverNamespace = socketIO.of(namespace);
+
+      Promise.delay(500).tap(() => {
+        callback(serverNamespace, SocketIOClient(url));
+      });
     });
   }
 });

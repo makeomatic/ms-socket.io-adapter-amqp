@@ -112,7 +112,9 @@ class AMQPAdapter extends Adapter {
       .bindRoutingKey(this.transport.makeRoutingKey(this.nsp.name, room))
       .return(true)
       .catch(error => {
-        this.emit('error', error);
+        if (this.listenerCount('error')) {
+          this.emit('error', error);
+        }
       });
 
     if (is.fn(callback)) {
@@ -140,7 +142,9 @@ class AMQPAdapter extends Adapter {
         .unbindRoutingKey(this.transport.makeRoutingKey(this.nsp.name, room))
         .return(true)
         .catch(error => {
-          this.emit('error', error);
+          if (this.listenerCount('error')) {
+            this.emit('error', error);
+          }
         });
     } else {
       promise = Promise.resolve(true);
@@ -170,7 +174,9 @@ class AMQPAdapter extends Adapter {
         .tap(() => delete this.sids[id])
         .return(true)
         .catch(error => {
-          this.emit('error', error);
+          if (this.listenerCount('error')) {
+            this.emit('error', error);
+          }
         });
     } else {
       promise = Promise.resolve(true);
