@@ -22,6 +22,10 @@ By running socket.io with the `ms-socket.io-adapter-amqp` adapter
 you can run multiple socket.io instances in different processes or 
 servers that can all broadcast and emit events to and from each other.
 
+## Changelog
+
+- Initial Release: 01.07.2016
+
 ## License
 
 MIT
