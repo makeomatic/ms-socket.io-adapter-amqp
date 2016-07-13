@@ -1,0 +1,41 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "name": {
+      "type": "string",
+      "default": "socket.io-adapter-amqp"
+    },
+    "exchange": {
+      "type": "string",
+      "default": "socket.io-adapter-amqp"
+    },
+    "connection": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "host": {
+          "type": "string",
+          "format": "hostname",
+          "default": "localhost"
+        },
+        "port": {
+          "type": "integer",
+          "default": 5672
+        },
+        "login": {
+          "type": "string",
+          "default": "guest"
+        },
+        "password": {
+          "type": "string",
+          "default": "guest"
+        },
+        "vhost": {
+          "type": "string",
+          "default": "/"
+        }
+      }
+    }
+  }
+}

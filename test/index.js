@@ -7,10 +7,16 @@ const SocketIO = require('socket.io');
 const SocketIOClient = require('socket.io-client');
 
 describe('socket.io-adapter-amqp', function suite() {
-  describe('constructor', function suite() {
+  describe('create from options', function suite() {
     it('should throw error when trying to instance with invalid options', function test() {
       expect(() => AdapterFactory.fromOptions()).to.not.throw();
-      expect(() => AdapterFactory.fromOptions('localhost')).to.throw(Errors.ArgumentError);
+      expect(() => AdapterFactory.fromOptions('localhost')).to.throw(Errors.ValidationError);
+      expect(() => AdapterFactory.fromOptions({
+        exchangeArgs: {
+          autoDelete: false,
+          type: 'topic'
+        }
+      })).to.throw(Errors.ValidationError);
     });
   });
 
