@@ -1,10 +1,9 @@
+const _ = require('lodash');
 const AMQPTransport = require('ms-amqp-transport');
-const assert = require('assert');
 const debug = require('debug')('socket.io-adapter-amqp:transport');
 const Errors = require('common-errors');
 const is = require('is');
 const Promise = require('bluebird');
-const validator = require('./validator');
 const uid2 = require('uid2');
 
 /**
@@ -34,12 +33,10 @@ class Transport {
    * @param {Object} options
    */
   constructor(options = {}) {
-    assert.ifError(validator.validateSync('options', options).error);
-
     this.adapters = new Map();
     this.exchangeCreated = false;
     this.serverId = uid2(6);
-    this.transport = new AMQPTransport(Object.assign({}, options, Transport.essentialOptions));
+    this.transport = new AMQPTransport(_.merge({}, options, Transport.essentialOptions));
     this.queue = null;
 
     this.transport.on('consumed-queue-reconnected', (consumer, createdQueue) => {

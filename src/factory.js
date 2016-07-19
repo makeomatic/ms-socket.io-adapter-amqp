@@ -1,5 +1,6 @@
 const AMQPAdapter = require('./adapter');
 const Errors = require('common-errors');
+const is = require('is');
 const Namespace = require('socket.io/lib/namespace');
 const Transport = require('./transport');
 
@@ -12,6 +13,10 @@ class AdapterFactory {
    * @returns {AdapterFactory}
    */
   static fromOptions(options = {}) {
+    if (is.object(options) === false) {
+      throw new Errors.ArgumentError('options');
+    }
+
     const transport = new Transport(options);
     return new AdapterFactory(transport);
   }

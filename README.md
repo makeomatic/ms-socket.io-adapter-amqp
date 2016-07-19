@@ -29,16 +29,12 @@ servers that can all broadcast and emit events to and from each other.
 
 `options`: [ms-amqp-transport](https://github.com/makeomatic/ms-amqp-transport) options
 
-Allowed options:
+Options that has no effect:
 
-* `name`
-* `exchange`: exchange name, default `socket.io-adapter-amqp`
-* `connection`
-    * `host`
-    * `port`
-    * `login`
-    * `password`
-    * `vhost`
+* `exchangeArgs.autoDelete` (`true`)
+* `exchangeArgs.type` (`direct`)
+* `defaultQueueOpts.autoDelete` (`true`)
+* `defaultQueueOpts.exclusive` (`true`)
 
 ## Changelog
 

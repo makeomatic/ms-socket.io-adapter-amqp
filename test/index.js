@@ -2,6 +2,7 @@ const { expect } = require('chai');
 const AdapterFactory = require('../src');
 const Errors = require('common-errors');
 const http = require('http').Server;
+const Transport = require('./../src/transport');
 const Promise = require('bluebird');
 const SocketIO = require('socket.io');
 const SocketIOClient = require('socket.io-client');
@@ -10,13 +11,12 @@ describe('socket.io-adapter-amqp', function suite() {
   describe('create from options', function suite() {
     it('should throw error when trying to instance with invalid options', function test() {
       expect(() => AdapterFactory.fromOptions()).to.not.throw();
-      expect(() => AdapterFactory.fromOptions('localhost')).to.throw(Errors.ValidationError);
-      expect(() => AdapterFactory.fromOptions({
-        exchangeArgs: {
-          autoDelete: false,
-          type: 'topic'
-        }
-      })).to.throw(Errors.ValidationError);
+      expect(() => AdapterFactory.fromOptions('localhost')).to.throw(Errors.ArgumentError);
+    });
+
+    it('should not be able to set exchange type', function test() {
+      const transport = new Transport({ exchangeArgs: { type: 'topic' } });
+      expect(transport.transport._config.exchangeArgs.type).to.be.equals('direct');
     });
   });
 
