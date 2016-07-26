@@ -3,7 +3,6 @@
 [![npm version](https://badge.fury.io/js/ms-socket.io-adapter-amqp.svg)](https://badge.fury.io/js/ms-socket.io-adapter-amqp)
 [![Build Status](https://semaphoreci.com/api/v1/makeomatic/ms-socket-io-adapter-amqp/branches/master/shields_badge.svg)](https://semaphoreci.com/makeomatic/ms-socket-io-adapter-amqp)
 
-
 ## How to use
 
 ```bash
