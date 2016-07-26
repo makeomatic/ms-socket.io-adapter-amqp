@@ -133,7 +133,7 @@ class AMQPAdapter extends Adapter {
    */
   del(id, room, callback) {
     debug('#%s: removing %s from %s', this.transport.serverId, id, room);
-    const hasRoom = this.rooms.hasOwnProperty(room);
+    const hasRoom = this.rooms[room] !== undefined;
     let promise;
     super.del(id, room);
 

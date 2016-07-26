@@ -18,13 +18,12 @@ class AdapterFactory {
     }
 
     const transport = new Transport(options);
-
     return new AdapterFactory(transport);
   }
 
   /**
    * @param transport
-   * @returns {AdapterFactory.factory}
+   * @returns {AdapterFactory.fromOptions}
    */
   constructor(transport) {
     if (transport instanceof Transport === false) {

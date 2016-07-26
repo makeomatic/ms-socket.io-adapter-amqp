@@ -1,3 +1,4 @@
+const _ = require('lodash');
 const AMQPTransport = require('ms-amqp-transport');
 const debug = require('debug')('socket.io-adapter-amqp:transport');
 const Errors = require('common-errors');
@@ -17,8 +18,7 @@ class Transport {
   /**
    *
    */
-  static defaultOptions = {
-    exchange: 'socket.io-adapter-amqp',
+  static essentialOptions = {
     exchangeArgs: {
       autoDelete: true,
       type: 'direct',
@@ -33,14 +33,10 @@ class Transport {
    * @param {Object} options
    */
   constructor(options = {}) {
-    if (is.object(options) === false) {
-      throw new Errors.ArgumentError('transportOptions');
-    }
-
     this.adapters = new Map();
     this.exchangeCreated = false;
     this.serverId = uid2(6);
-    this.transport = new AMQPTransport(Object.assign({}, options, Transport.defaultOptions));
+    this.transport = new AMQPTransport(_.merge({}, options, Transport.essentialOptions));
     this.queue = null;
 
     this.transport.on('consumed-queue-reconnected', (consumer, createdQueue) => {
