@@ -145,8 +145,8 @@ class Transport {
    * @param {Array} parts
    * @returns {String}
    */
-  makeRoutingKey(...parts) {
-    parts.forEach(part => {
+  static makeRoutingKey(...parts) {
+    parts.forEach((part) => {
       if (is.string(part) === false) {
         throw new Errors.ArgumentError('part');
       }

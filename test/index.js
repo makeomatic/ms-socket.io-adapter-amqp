@@ -1,3 +1,4 @@
+/* eslint-disable no-unused-expressions */
 const { expect } = require('chai');
 const AdapterFactory = require('../src');
 const Errors = require('common-errors');
@@ -8,7 +9,34 @@ const SocketIO = require('socket.io');
 const SocketIOClient = require('socket.io-client');
 
 describe('socket.io-adapter-amqp', function suite() {
-  describe('create from options', function suite() {
+  /**
+   * Create a pair of socket.io server+client
+   *
+   * @param {Function} callback
+   * @param {String} namespace
+   */
+  function create(callback, namespace = '/chat') {
+    const server = http();
+    const socketIO = SocketIO(server);
+    const adapter = AdapterFactory.fromOptions();
+
+    socketIO.adapter(adapter);
+    server.listen((err) => {
+      if (err) {
+        throw err; // abort tests
+      }
+
+      const address = server.address();
+      const url = `http://localhost:${address.port}${namespace}`;
+      const serverNamespace = socketIO.of(namespace);
+
+      Promise.delay(500).tap(() => {
+        callback(serverNamespace, SocketIOClient(url));
+      });
+    });
+  }
+
+  describe('create from options', () => {
     it('should throw error when trying to instance with invalid options', function test() {
       expect(() => AdapterFactory.fromOptions()).to.not.throw();
       expect(() => AdapterFactory.fromOptions('localhost')).to.throw(Errors.ArgumentError);
@@ -20,56 +48,56 @@ describe('socket.io-adapter-amqp', function suite() {
     });
   });
 
-  describe('broadcasts', function suite() {
+  describe('broadcasts', () => {
     it('broadcasts to namespace', function test(done) {
       create((server1, client1) => {
         create((server2, client2) => {
           client1.on('woot', (a, b) => {
             expect(a).to.eql([]);
-            expect(b).to.eql({a: 'b'});
+            expect(b).to.eql({ a: 'b' });
             client1.disconnect();
             client2.disconnect();
             done();
           });
-          server2.on('connection', c2 => {
-            client2.on('woot', (a, b) => {
+          server2.on('connection', (c2) => {
+            client2.on('woot', () => {
               throw new Error();
             });
-            c2.broadcast.emit('woot', [], {a: 'b'});
+            c2.broadcast.emit('woot', [], { a: 'b' });
           });
         });
       });
     });
 
-    it('broadcasts to rooms', function(done) {
-      create(function(server1, client1) {
-        server1.on('connection', function(c1) {
+    it('broadcasts to rooms', (done) => {
+      create((server1, client1) => {
+        server1.on('connection', (c1) => {
           c1.join('woot');
         });
 
-        create(function(server2, client2) {
-          server2.on('connection', function(c2) {
+        create((server2, client2) => {
+          server2.on('connection', (c2) => {
             // does not join, performs broadcast
-            c2.on('do broadcast', function() {
+            c2.on('do broadcast', () => {
               c2.broadcast.to('woot').emit('broadcast');
             });
           });
 
-          client2.on('broadcast', function(){
+          client2.on('broadcast', () => {
             throw new Error('Not in room');
           });
 
-          create(function(server3, client3) {
-            server3.on('connection', function(c3){
+          create((server3, client3) => {
+            server3.on('connection', () => {
               // does not join, signals broadcast
               client2.emit('do broadcast');
             });
 
-            client3.on('broadcast', function(){
+            client3.on('broadcast', () => {
               throw new Error('Not in room');
             });
 
-            client1.on('broadcast', function(){
+            client1.on('broadcast', () => {
               client1.disconnect();
               client2.disconnect();
               client3.disconnect();
@@ -80,31 +108,31 @@ describe('socket.io-adapter-amqp', function suite() {
       });
     });
 
-    it('doesn\'t broadcast to left rooms', function(done) {
-      create(function(server1, client1) {
-        server1.on('connection', function(c1) {
+    it('doesn\'t broadcast to left rooms', (done) => {
+      create((server1, client1) => {
+        server1.on('connection', (c1) => {
           c1.join('woot');
           c1.leave('woot');
         });
 
-        client1.on('broadcast', function(){
+        client1.on('broadcast', () => {
           throw new Error('Not in room');
         });
 
-        create(function(server2, client2) {
-          server2.on('connection', function(c2) {
-            c2.on('do broadcast', function(){
-              setTimeout(function() {
+        create((server2, client2) => {
+          server2.on('connection', (c2) => {
+            c2.on('do broadcast', () => {
+              setTimeout(() => {
                 c2.broadcast.to('woot').emit('broadcast');
               }, 500);
             });
           });
 
-          create(function(server3, client3) {
-            server3.on('connection', function(c3) {
+          create((server3, client3) => {
+            server3.on('connection', (c3) => {
               c3.join('woot', () => {
-                client3.on('broadcast', function() {
-                  setTimeout(function() {
+                client3.on('broadcast', () => {
+                  setTimeout(() => {
                     client1.disconnect();
                     client2.disconnect();
                     client3.disconnect();
@@ -120,16 +148,21 @@ describe('socket.io-adapter-amqp', function suite() {
       });
     });
 
-    it('deletes rooms upon disconnection', function(done) {
-      create(function(server, client) {
-        server.on('connection', function(c) {
+    it('deletes rooms upon disconnection', (done) => {
+      create((server, client) => {
+        server.on('connection', (c) => {
           c.join('woot');
-          c.on('disconnect', function() {
-            expect(c.adapter.sids[c.id]).to.be.empty;
-            expect(c.adapter.rooms).to.be.empty;
-            client.disconnect();
-            done();
-          });
+
+          // delay is needed because delete happens in async fashion
+          // and takes a few ticks
+          c.on('disconnect', () => Promise.delay(250)
+            .then(() => {
+              expect(c.adapter.sids[c.id]).to.be.empty;
+              expect(c.adapter.rooms).to.be.empty;
+              client.disconnect();
+            })
+            .asCallback(done)
+          );
 
           setTimeout(() => {
             c.disconnect();
@@ -138,31 +171,4 @@ describe('socket.io-adapter-amqp', function suite() {
       });
     });
   });
-
-  /**
-   * Create a pair of socket.io server+client
-   *
-   * @param {Function} callback
-   * @param {String} namespace
-   */
-  function create(callback, namespace = '/chat') {
-    const server = http();
-    const socketIO = SocketIO(server);
-    const adapter = AdapterFactory.fromOptions();
-
-    socketIO.adapter(adapter);
-    server.listen(err => {
-      if (err) {
-        throw err; // abort tests
-      }
-
-      const address = server.address();
-      const url = 'http://localhost:' + address.port + namespace;
-      const serverNamespace = socketIO.of(namespace);
-
-      Promise.delay(500).tap(() => {
-        callback(serverNamespace, SocketIOClient(url));
-      });
-    });
-  }
 });

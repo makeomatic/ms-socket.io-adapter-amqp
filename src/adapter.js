@@ -25,7 +25,7 @@ class AMQPAdapter extends Adapter {
 
     super(namespace);
     this.transport = transport;
-    this.routingKey = transport.makeRoutingKey(namespace.name);
+    this.routingKey = Transport.makeRoutingKey(namespace.name);
 
     transport.bindRoutingKey(this.routingKey);
     transport.adapters.set(namespace.name, this);
@@ -43,13 +43,13 @@ class AMQPAdapter extends Adapter {
     // if broadcasting from local node, need to broadcast to another nodes
     // else means that message came from amqp and already broadcasted
     if (fromAnotherNode === false) {
-      const routingKey = this.transport.makeRoutingKey(packet.nsp);
+      const routingKey = Transport.makeRoutingKey(packet.nsp);
       const message = [this.transport.serverId, packet, options];
 
       if (options.rooms) {
         return Promise.map(
           options.rooms,
-          room => this.transport.publish(this.transport.makeRoutingKey(routingKey, room), message)
+          room => this.transport.publish(Transport.makeRoutingKey(routingKey, room), message)
         );
       }
 
@@ -109,9 +109,9 @@ class AMQPAdapter extends Adapter {
     super.add(id, room);
 
     const promise = this.transport
-      .bindRoutingKey(this.transport.makeRoutingKey(this.nsp.name, room))
+      .bindRoutingKey(Transport.makeRoutingKey(this.nsp.name, room))
       .return(true)
-      .catch(error => {
+      .catch((error) => {
         if (this.listenerCount('error')) {
           this.emit('error', error);
         }
@@ -139,11 +139,13 @@ class AMQPAdapter extends Adapter {
 
     if (hasRoom && !this.rooms[room]) {
       promise = this.transport
-        .unbindRoutingKey(this.transport.makeRoutingKey(this.nsp.name, room))
+        .unbindRoutingKey(Transport.makeRoutingKey(this.nsp.name, room))
         .return(true)
-        .catch(error => {
+        .catch((error) => {
           if (this.listenerCount('error')) {
             this.emit('error', error);
+          } else {
+            debug('failed to remove %s from room %s', id, room, error);
           }
         });
     } else {
@@ -173,9 +175,11 @@ class AMQPAdapter extends Adapter {
       promise = Promise.map(Object.keys(rooms), room => this.del(id, room))
         .tap(() => delete this.sids[id])
         .return(true)
-        .catch(error => {
+        .catch((error) => {
           if (this.listenerCount('error')) {
             this.emit('error', error);
+          } else {
+            debug('failed to remove %s from rooms', id, error);
           }
         });
     } else {
