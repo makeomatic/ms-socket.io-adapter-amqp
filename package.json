@@ -45,7 +45,7 @@
   },
   "peerDependencies": {
     "common-errors": "~1.x.x",
-    "ms-amqp-transport": "~4.x.x || ~5.x.x"
+    "ms-amqp-transport": ">= 4.x.x < 8"
   },
   "release": {
     "verifyConditions": []
