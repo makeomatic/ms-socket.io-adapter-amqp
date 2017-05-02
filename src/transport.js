@@ -43,7 +43,12 @@ class Transport {
       debug('#%s: fired reconnected event', this.serverId);
       this.queue = createdQueue;
     });
-    this.transport.connect().then(() => this.transport.createConsumedQueue(this.router.bind(this)));
+
+    this.transport
+      .connect()
+      .then(() => this.transport.createConsumedQueue(this.router.bind(this)))
+      .catch(e => setImmediate(() => { throw e; }));
+
     debug('#%s: adapter was created', this.serverId);
   }
 
