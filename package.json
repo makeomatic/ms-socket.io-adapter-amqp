@@ -16,10 +16,10 @@
   },
   "dependencies": {
     "bluebird": "^3.4.6",
-    "debug": "^2.3.3",
+    "debug": "^2.6.8",
     "is": "^3.2.0",
     "lodash": "^4.17.2",
-    "socket.io-adapter": "0.x.x",
+    "socket.io-adapter": "^1.1.0",
     "uid2": "0.0.3"
   },
   "devDependencies": {
@@ -29,24 +29,24 @@
     "babel-plugin-transform-strict-mode": "^6.18.0",
     "babel-register": "^6.18.0",
     "bunyan": "^1.8.5",
-    "chai": "^3.5.0",
-    "common-errors": "^1.0.0",
+    "chai": "^4.0.1",
+    "common-errors": "^1.0.2",
     "cz-conventional-changelog": "^2.0.0",
     "eslint": "^3.10.2",
     "eslint-config-makeomatic": "^1.0.1",
-    "eslint-plugin-import": "^2.2.0",
+    "eslint-plugin-import": "^2.3.0",
     "eslint-plugin-promise": "^3.5.0",
-    "mocha": "^3.2.0",
-    "ms-amqp-transport": "^8.0.0",
-    "ms-validation": "^4.0.0",
+    "mocha": "^3.4.2",
+    "ms-amqp-transport": "^9.0.0",
+    "ms-validation": "^5.0.1",
     "semantic-release": "^6.3.2",
-    "socket.io": "^1.6.0",
-    "socket.io-client": "^1.6.0",
+    "socket.io": "^2.0.2",
+    "socket.io-client": "^2.0.2",
     "stdout-stream": "^1.4.0"
   },
   "peerDependencies": {
     "common-errors": "~1.x.x",
-    "ms-amqp-transport": ">= 8.x.x < 9"
+    "ms-amqp-transport": ">= 8.x.x < 10"
   },
   "release": {
     "verifyConditions": []

@@ -1,4 +1,4 @@
-const _ = require('lodash');
+const merge = require('lodash/merge');
 const AMQPTransport = require('ms-amqp-transport');
 const debug = require('debug')('socket.io-adapter-amqp:transport');
 const Errors = require('common-errors');
@@ -36,7 +36,7 @@ class Transport {
     this.adapters = new Map();
     this.exchangeCreated = false;
     this.serverId = uid2(6);
-    this.transport = new AMQPTransport(_.merge({}, options, Transport.essentialOptions));
+    this.transport = new AMQPTransport(merge({}, options, Transport.essentialOptions));
     this.queue = null;
 
     this.transport.on('consumed-queue-reconnected', (consumer, createdQueue) => {
@@ -87,9 +87,8 @@ class Transport {
         this.serverId,
         routingKey
       );
-      return Promise.delay(100)
-        .return(routingKey)
-        .bind(this)
+      return Promise.bind(this, routingKey)
+        .delay(100)
         .then(this.bindRoutingKey);
     }
 
@@ -135,12 +134,14 @@ class Transport {
         this.serverId,
         routingKey
       );
-      return Promise.delay(100)
-        .return([routingKey, message])
-        .bind(this)
+
+      return Promise
+        .bind(this, [routingKey, message])
+        .delay(100)
         .spread(this.publish);
     }
 
+    debug('publishing to %s', routingKey);
     return this.transport.publish(routingKey, message)
       .tap(() => debug('#%s: publish to %s', this.serverId, routingKey))
       .return(true);

@@ -38,6 +38,8 @@ class AMQPAdapter extends Adapter {
    * @param fromAnotherNode
    */
   broadcast(packet, options, fromAnotherNode = false) {
+    debug('broadcasting', packet, options, fromAnotherNode);
+
     super.broadcast(packet, options);
 
     // if broadcasting from local node, need to broadcast to another nodes
@@ -46,13 +48,14 @@ class AMQPAdapter extends Adapter {
       const routingKey = Transport.makeRoutingKey(packet.nsp);
       const message = [this.transport.serverId, packet, options];
 
-      if (options.rooms) {
+      if (options.rooms.length) {
         return Promise.map(
           options.rooms,
           room => this.transport.publish(Transport.makeRoutingKey(routingKey, room), message)
         );
       }
 
+      debug('publishing to %s', routingKey, message);
       return this.transport.publish(routingKey, message);
     }
 
@@ -104,24 +107,26 @@ class AMQPAdapter extends Adapter {
    * @param {String} room
    * @param {Function} callback
    */
-  add(id, room, callback) {
-    debug('#%s: adding %s to %s ', this.transport.serverId, id, room);
-    super.add(id, room);
+  addAll(id, rooms, callback) {
+    debug('#%s: adding %s to %s ', this.transport.serverId, id, rooms);
+    super.addAll(id, rooms);
 
-    const promise = this.transport
+    const promises = Promise.map(rooms, room => (
+      this.transport
       .bindRoutingKey(Transport.makeRoutingKey(this.nsp.name, room))
       .return(true)
       .catch((error) => {
         if (this.listenerCount('error')) {
           this.emit('error', error);
         }
-      });
+      })
+    ));
 
     if (is.fn(callback)) {
-      return promise.asCallback(callback);
+      return promises.asCallback(callback);
     }
 
-    return promise;
+    return promises;
   }
 
   /**
