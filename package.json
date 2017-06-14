@@ -23,13 +23,14 @@
     "uid2": "0.0.3"
   },
   "devDependencies": {
+    "@microfleet/transport-amqp": "^9.0.0",
     "babel-cli": "^6.18.0",
     "babel-eslint": "^7.1.1",
     "babel-plugin-transform-class-properties": "^6.19.0",
     "babel-plugin-transform-strict-mode": "^6.18.0",
     "babel-register": "^6.18.0",
     "bunyan": "^1.8.5",
-    "chai": "^4.0.1",
+    "chai": "^4.0.2",
     "common-errors": "^1.0.2",
     "cz-conventional-changelog": "^2.0.0",
     "eslint": "^3.10.2",
@@ -37,16 +38,15 @@
     "eslint-plugin-import": "^2.3.0",
     "eslint-plugin-promise": "^3.5.0",
     "mocha": "^3.4.2",
-    "ms-amqp-transport": "^9.0.0",
     "ms-validation": "^5.0.1",
     "semantic-release": "^6.3.2",
-    "socket.io": "^2.0.2",
-    "socket.io-client": "^2.0.2",
+    "socket.io": "^2.0.3",
+    "socket.io-client": "^2.0.3",
     "stdout-stream": "^1.4.0"
   },
   "peerDependencies": {
-    "common-errors": "~1.x.x",
-    "ms-amqp-transport": ">= 8.x.x < 10"
+    "@microfleet/transport-amqp": ">= 9.x.x < 10",
+    "common-errors": "~1.x.x"
   },
   "release": {
     "verifyConditions": []

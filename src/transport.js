@@ -1,5 +1,5 @@
 const merge = require('lodash/merge');
-const AMQPTransport = require('ms-amqp-transport');
+const AMQPTransport = require('@microfleet/transport-amqp');
 const debug = require('debug')('socket.io-adapter-amqp:transport');
 const Errors = require('common-errors');
 const is = require('is');

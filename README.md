@@ -18,15 +18,15 @@ socketIO.adapter(adapter);
 
 ## Overview
 
-By running socket.io with the `ms-socket.io-adapter-amqp` adapter 
-you can run multiple socket.io instances in different processes or 
+By running socket.io with the `ms-socket.io-adapter-amqp` adapter
+you can run multiple socket.io instances in different processes or
 servers that can all broadcast and emit events to and from each other.
 
 ## API
 
 ### `AdapterFactory.fromOptions(options)`
 
-`options`: [ms-amqp-transport](https://github.com/makeomatic/ms-amqp-transport) options
+`options`: [@microfleet/transport-amqp](https://github.com/microfleet/transport-amqp) options
 
 Options that has no effect:
 
