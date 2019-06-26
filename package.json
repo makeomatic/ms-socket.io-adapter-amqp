@@ -1,6 +1,7 @@
 {
   "name": "ms-socket.io-adapter-amqp",
-  "description": "Socket.io adapter for amqp using 'ms-transport-amqp'",
+  "description": "Socket.io adapter for amqp using '@microfleet/transport-amqp'",
+  "version": "0.0.0",
   "main": "./lib/index.js",
   "license": "MIT",
   "repository": {
@@ -10,50 +11,52 @@
   "scripts": {
     "compile": "babel -d ./lib ./src",
     "lint": "eslint ./src",
-    "prepublish": "npm run lint && npm run compile",
-    "test": "npm run lint && mocha",
-    "semantic-release": "semantic-release pre && npm publish && semantic-release post"
+    "prepublish": "yarn lint && yarn compile",
+    "test": "yarn lint && mocha",
+    "semantic-release": "semantic-release"
   },
   "dependencies": {
-    "bluebird": "^3.4.6",
-    "debug": "^2.6.8",
-    "is": "^3.2.0",
-    "lodash": "^4.17.2",
-    "socket.io-adapter": "^1.1.0",
+    "bluebird": "^3.5.5",
+    "debug": "^4.1.1",
+    "is": "^3.3.0",
+    "lodash": "^4.17.11",
+    "socket.io-adapter": "^1.1.1",
     "uid2": "0.0.3"
   },
   "devDependencies": {
-    "@microfleet/transport-amqp": "^9.0.0",
-    "babel-cli": "^6.18.0",
-    "babel-eslint": "^7.1.1",
-    "babel-plugin-transform-class-properties": "^6.19.0",
-    "babel-plugin-transform-strict-mode": "^6.18.0",
-    "babel-register": "^6.18.0",
-    "bunyan": "^1.8.5",
-    "chai": "^4.0.2",
-    "common-errors": "^1.0.2",
-    "cz-conventional-changelog": "^2.0.0",
-    "eslint": "^3.10.2",
-    "eslint-config-makeomatic": "^1.0.1",
-    "eslint-plugin-import": "^2.3.0",
-    "eslint-plugin-promise": "^3.5.0",
-    "mocha": "^3.4.2",
-    "ms-validation": "^5.0.1",
-    "semantic-release": "^6.3.2",
-    "socket.io": "^2.0.3",
-    "socket.io-client": "^2.0.3",
-    "stdout-stream": "^1.4.0"
+    "@babel/cli": "^7.0.0",
+    "@babel/core": "^7.0.0",
+    "@babel/plugin-proposal-class-properties": "^7.0.0",
+    "@babel/plugin-transform-strict-mode": "^7.0.0",
+    "@babel/register": "^7.0.0",
+    "@makeomatic/deploy": "^8.4.4",
+    "@microfleet/transport-amqp": "^14.0.0",
+    "babel-eslint": "^10.0.2",
+    "chai": "^4.2.0",
+    "common-errors": "^1.0.5",
+    "eslint": "^6.0.1",
+    "eslint-config-makeomatic": "^3.0.0",
+    "eslint-plugin-import": "^2.18.0",
+    "eslint-plugin-promise": "^4.2.1",
+    "mocha": "^6.1.4",
+    "ms-validation": "^7.2.0",
+    "semantic-release": "^15.13.17",
+    "socket.io": "^2.2.0",
+    "socket.io-client": "^2.2.0",
+    "stdout-stream": "^1.4.1"
   },
   "peerDependencies": {
-    "@microfleet/transport-amqp": ">= 9.x.x < 10",
+    "@microfleet/transport-amqp": ">= 14",
     "common-errors": "~1.x.x"
   },
-  "release": {
-    "verifyConditions": []
-  },
-  "config": {
-    "commitizen": {
-      "path": "./node_modules/cz-conventional-changelog"
+  "husky": {
+    "hooks": {
+      "commit-msg": "commitlint -e $HUSKY_GIT_PARAMS",
+      "prepare-commit-msg": "./node_modules/@makeomatic/deploy/git-hooks/prepare-commit-msg $HUSKY_GIT_PARAMS"
     }
-  }
+  },
+  "files": [
+    "src/",
+    "lib/"
+  ]
 }

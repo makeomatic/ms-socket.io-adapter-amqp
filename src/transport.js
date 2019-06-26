@@ -57,7 +57,7 @@ class Transport {
    * @param {Object} headers
    */
   router(message, headers) {
-    const routingKey = headers.routingKey;
+    const { routingKey } = headers;
     // expected that routingKey should be following pattern {namespace}.[{room}]
     const routingParts = routingKey.split(Transport.ROUTING_KEY_DELIMITER);
     debug('#%s: get message for', this.serverId, routingKey);

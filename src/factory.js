@@ -1,7 +1,7 @@
-const AMQPAdapter = require('./adapter');
 const Errors = require('common-errors');
 const is = require('is');
 const Namespace = require('socket.io/lib/namespace');
+const AMQPAdapter = require('./adapter');
 const Transport = require('./transport');
 
 /**

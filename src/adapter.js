@@ -113,13 +113,13 @@ class AMQPAdapter extends Adapter {
 
     const promises = Promise.map(rooms, room => (
       this.transport
-      .bindRoutingKey(Transport.makeRoutingKey(this.nsp.name, room))
-      .return(true)
-      .catch((error) => {
-        if (this.listenerCount('error')) {
-          this.emit('error', error);
-        }
-      })
+        .bindRoutingKey(Transport.makeRoutingKey(this.nsp.name, room))
+        .return(true)
+        .catch((error) => {
+          if (this.listenerCount('error')) {
+            this.emit('error', error);
+          }
+        })
     ));
 
     if (is.fn(callback)) {

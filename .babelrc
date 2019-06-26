@@ -1,6 +1,6 @@
 {
   "plugins": [
-    "transform-class-properties",
-    "transform-strict-mode"
+    "@babel/plugin-proposal-class-properties",
+    "@babel/plugin-transform-strict-mode"
   ]
 }

@@ -1,13 +1,13 @@
 /* eslint-disable no-unused-expressions */
 const { expect } = require('chai');
 const Promise = require('bluebird');
-const AdapterFactory = require('../src');
 const Errors = require('common-errors');
 const http = require('http').Server;
-const Transport = require('./../src/transport');
 const SocketIO = require('socket.io');
 const SocketIOClient = require('socket.io-client');
 const debug = require('debug')('socket.io-adapter-amqp:test');
+const Transport = require('./../src/transport');
+const AdapterFactory = require('../src');
 
 describe('socket.io-adapter-amqp', function suite() {
   /**
@@ -56,7 +56,7 @@ describe('socket.io-adapter-amqp', function suite() {
 
     it('should not be able to set exchange type', function test() {
       const transport = new Transport({ exchangeArgs: { type: 'topic' } });
-      expect(transport.transport._config.exchangeArgs.type).to.be.equals('direct');
+      expect(transport.transport.config.exchangeArgs.type).to.be.equals('direct');
     });
   });
 
@@ -80,7 +80,7 @@ describe('socket.io-adapter-amqp', function suite() {
 
         serverClient2.broadcast.emit('woot', [], { a: 'b' });
       })
-      .catch(done);
+        .catch(done);
     });
 
     it('broadcasts to rooms', (done) => {
@@ -113,7 +113,7 @@ describe('socket.io-adapter-amqp', function suite() {
         // does not join, signals broadcast
         client2.emit('do broadcast');
       })
-      .catch(done);
+        .catch(done);
     });
 
     it('doesn\'t broadcast to left rooms', (done) => {
@@ -148,7 +148,7 @@ describe('socket.io-adapter-amqp', function suite() {
           client2.emit('do broadcast');
         });
       })
-      .catch(done);
+        .catch(done);
     });
 
     it('deletes rooms upon disconnection', (done) => {
@@ -164,14 +164,13 @@ describe('socket.io-adapter-amqp', function suite() {
             client.disconnect();
             return null;
           })
-          .asCallback(done)
-        );
+          .asCallback(done));
 
         setTimeout(() => {
           serverClient.disconnect();
         }, 1000);
       })
-      .catch(done);
+        .catch(done);
     });
   });
 });
