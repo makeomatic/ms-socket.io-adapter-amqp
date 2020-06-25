@@ -1,4 +1,6 @@
 {
-  "extends": "makeomatic",
-  "parser": "babel-eslint"
+  "extends": "makeomatic/typescript",
+  "parserOptions": {
+    "ecmaVersion": 2019
+  }
 }
