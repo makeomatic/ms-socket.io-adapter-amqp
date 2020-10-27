@@ -1,7 +1,10 @@
 /* eslint-disable @typescript-eslint/no-namespace */
-import AdapterFactory from './factory'
 import type SocketIO from 'socket.io'
 import type { Server as HttpServer } from 'http'
+
+import AdapterFactory from './factory'
+import AMQPAdapter from './adapter'
+import Transport from './transport'
 
 declare module 'socket.io' {
   interface BroadcastOptions {
@@ -29,10 +32,14 @@ declare module 'socket.io' {
     broadcast: Broadcast
   }
 
+  export interface Adapter {
+    transport: Transport
+  }
+
   export interface Server {
     httpServer?: HttpServer
   }
 }
 
-export { AdapterFactory }
+export { AdapterFactory, Transport, AMQPAdapter as Adapter }
 export default AdapterFactory
