@@ -1,43 +1,33 @@
-/* eslint-disable @typescript-eslint/no-namespace */
-import type SocketIO from 'socket.io'
-import type { Server as HttpServer } from 'http'
-
-import AdapterFactory from './factory'
-import AMQPAdapter from './adapter'
-import Transport from './transport'
+import type { BroadcastOptions } from 'socket.io-adapter'
+import { AdapterFactory } from './factory'
+import { AMQPAdapter } from './adapter'
+import { Transport } from './transport'
 
 declare module 'socket.io' {
-  interface BroadcastOptions {
-    rooms: string[];
-    except?: string[];
-    flags?: {
-      volatile: boolean;
-      compress: boolean;
-    }
-  }
-
   export interface Packet {
+    type: number
     nsp: string | undefined
+    data: [event: string, ...args: any[]]
   }
 
-  export type Message = [string, SocketIO.Packet, BroadcastOptions]
+  export type EncodeOptions<T> = {
+    [K in keyof T]: T[K] extends Set<infer A> | undefined ? A[] : T[K]
+  }
 
-  export interface Broadcast extends SocketIO.Namespace {
-    (packet: SocketIO.Packet, options: BroadcastOptions, fromAnotherNode: boolean): Promise<boolean>
+  export type Message = [string, Packet, BroadcastOptions]
+  export type EncodedMessage = [string, Packet, EncodeOptions<BroadcastOptions>]
+
+  export interface Broadcast extends Namespace {
+    (packet: Packet, options: BroadcastOptions, fromAnotherNode: boolean): Promise<boolean>
   }
 
   export interface Namespace {
-    id: string
-    name: string
-    broadcast: Broadcast
+    readonly id: string
   }
 
   export interface Adapter {
     transport: Transport
-  }
-
-  export interface Server {
-    httpServer?: HttpServer
+    nsp: Namespace
   }
 }
 

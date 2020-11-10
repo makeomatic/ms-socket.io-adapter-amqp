@@ -1,11 +1,30 @@
-import Adapter = require('socket.io-adapter')
+import { Adapter, BroadcastOptions } from 'socket.io-adapter'
 import _debug = require('debug')
 import Errors = require('common-errors')
 import Bluebird = require('bluebird')
-import Transport from './transport'
-import type { Namespace } from 'socket.io'
+import { Transport } from './transport'
+import type { Server as httpServer } from 'http'
+import type { Namespace, Message, Packet, EncodedMessage, EncodeOptions } from 'socket.io'
 
 const debug = _debug('socket.io-adapter-amqp:adapter')
+
+const broadcastOptsProto = Object.create({}, {
+  except: {
+    enumerable: true,
+    writable: true,
+    value: undefined
+  },
+  rooms: {
+    enumerable: true,
+    writable: true,
+    value: undefined
+  },
+  flags: {
+    enumerable: true,
+    writable: true,
+    value: undefined
+  }
+})
 
 /**
  *
@@ -16,10 +35,10 @@ export class AMQPAdapter extends Adapter {
   public namespace: Namespace
 
   /**
-   * @param {Namespace} namespace
-   * @param {Transport} transport
+   * @param namespace
+   * @param transport
    */
-  constructor(namespace: SocketIO.Namespace, transport: Transport) {
+  constructor(namespace: Namespace, transport: Transport) {
     if (transport instanceof Transport === false) {
       throw new Errors.ArgumentError('transport')
     }
@@ -40,21 +59,26 @@ export class AMQPAdapter extends Adapter {
   private setupConnectionListeners(): void {
     const { namespace: { server } } = this
 
-    if (server.httpServer) {
-      if (server.httpServer.listening) {
+    // @ts-expect-error - must access private property to attach
+    //  to error listeners
+    const httpServer = server.httpServer as httpServer
+    if (httpServer) {
+      if (httpServer.listening) {
         this.onListen()
       }
 
-      server.httpServer.once('close', this.onClose.bind(this))
-      server.httpServer.once('listening', this.onListen.bind(this))
+      httpServer.once('close', this.onClose.bind(this))
+      httpServer.once('listening', this.onListen.bind(this))
     }
   }
 
   private async onListen(): Promise<void> {
     try {
+      // eslint-disable-next-line no-console
+      console.trace('onListen called')
       await this.transport.connect()
     } catch (e) {
-      debug('failed to connect to amqp transport', e)
+      debug('failed to connect to amqp transport', e.message)
     }
   }
 
@@ -62,45 +86,61 @@ export class AMQPAdapter extends Adapter {
     try {
       await this.transport.close()
     } catch (e) {
-      debug('failed to close connection to amqp transport', e)
+      debug('failed to close connection to amqp transport', e.message)
     }
   }
 
   /**
    * @param packet
    * @param options
-   * @param fromAnotherNode
+   * @param remote
    */
-  async broadcast(packet: SocketIO.Packet, options: SocketIO.BroadcastOptions, fromAnotherNode = false): Promise<boolean> {
-    debug('broadcasting', packet, options, fromAnotherNode)
-
+  async broadcast(packet: Packet, options: BroadcastOptions, remote = false): Promise<void> {
+    debug('called super broadcast - %j | %j | %j', packet, options, remote)
     super.broadcast(packet, options)
+
+    // will assign default opts
+    debug('broadcasting - %j | %j | %j', packet, options, remote)
 
     // if broadcasting from local node, need to broadcast to another nodes
     // else means that message came from amqp and already broadcasted
-    if (fromAnotherNode === false) {
+    if (remote === false || options.flags?.local) {
       const routingKey = Transport.makeRoutingKey(packet.nsp || '/')
-      const message: SocketIO.Message = [this.transport.serverId, packet, options]
+      const message: EncodedMessage = [this.transport.serverId, packet, this.encodeOptions(options)]
 
-      if (options.rooms.length) {
-        await Bluebird.map(options.rooms, (room: any) => (
-          this.transport.publish(Transport.makeRoutingKey(routingKey, room), message)
-        ))
-        return true
+      if (options.rooms.size) {
+        await Bluebird.map(options.rooms, async (room) => {
+          await this.transport.publish(Transport.makeRoutingKey(routingKey, room), message)
+        }, { concurrency: 10 })
+      } else {
+        await this.transport.publish(routingKey, message)
       }
+    }
+  }
 
-      debug('publishing to %s', routingKey, message)
-      return this.transport.publish(routingKey, message)
+  private encodeOptions(options: BroadcastOptions): EncodeOptions<BroadcastOptions> {
+    const opts: EncodeOptions<BroadcastOptions> = Object.create(broadcastOptsProto)
+
+    opts.flags = options.flags
+
+    if (options.rooms) {
+      opts.rooms = Array.from(options.rooms)
     }
 
-    return true
+    if (options.except) {
+      opts.except = Array.from(options.except)
+    }
+
+    return opts
   }
 
   /**
    * @param routingKey
    * @param message
    */
-  async processMessage(routingKey: string, message: SocketIO.Message): Promise<boolean> {
+  async processMessage(routingKey: string, message: Message): Promise<void> {
+    debug('[%s] received %s - %j', this.transport.serverId, routingKey, message)
+
     if (routingKey.startsWith(this.routingKey) === false) {
       debug(
         '#%s: ignore different routing keys %s and %s',
@@ -108,8 +148,7 @@ export class AMQPAdapter extends Adapter {
         routingKey,
         this.routingKey
       )
-
-      return true
+      return
     }
 
     const args = message
@@ -117,7 +156,7 @@ export class AMQPAdapter extends Adapter {
 
     if (messageServerId === this.transport.serverId) {
       debug('#%s: ignore same server id %s', this.transport.serverId, messageServerId)
-      return true
+      return
     }
 
     if (packet && packet.nsp === undefined) {
@@ -126,7 +165,16 @@ export class AMQPAdapter extends Adapter {
 
     if (!packet || packet.nsp !== this.nsp.name) {
       debug('#%s: ignore different namespace', this.transport.serverId)
-      return false
+      return
+    }
+
+    // AMQP serializes sets to objects
+    if (!(options.except instanceof Set)) {
+      options.except = new Set(options.except)
+    }
+
+    if (!(options.rooms instanceof Set)) {
+      options.rooms = new Set(options.rooms)
     }
 
     return this.broadcast(packet, options, true)
@@ -134,40 +182,25 @@ export class AMQPAdapter extends Adapter {
 
   /**
    * Subscribe client to room messages
-   *
-   * @param {String} id
-   * @param {String} room
-   * @param {Function} [callback]
+   * @param id
+   * @param room
    */
-  async add(id: string, room: string, callback?: () => void): Promise<void> {
+  async add(id: string, room: string): Promise<void> {
     debug('#%s: adding %s to %s ', this.transport.serverId, id, room)
-    super.add(id, room)
-
-    try {
-      await this.transport.bindRoutingKey(Transport.makeRoutingKey(this.nsp.name, room))
-    } catch (error) {
-      if (this.listenerCount('error')) {
-        this.emit('error', error)
-      } else {
-        debug('addAll failed', error)
-      }
-    }
-
-    if (callback) setImmediate(callback)
+    return this.addAll(id, new Set([room]))
   }
 
   /**
    * Subscribe client to room messages
    *
-   * @param {String} id
-   * @param {String[]} rooms
-   * @param {Function} [callback]
+   * @param id
+   * @param rooms
    */
-  async addAll(id: string, rooms: string[], callback?: () => void): Promise<void> {
+  async addAll(id: string, rooms: Set<string>): Promise<void> {
     debug('#%s: adding %s to %s ', this.transport.serverId, id, rooms)
     super.addAll(id, rooms)
 
-    const promises = Bluebird.map(rooms, async (room) => {
+    await Bluebird.map(rooms, async (room) => {
       try {
         await this.transport.bindRoutingKey(Transport.makeRoutingKey(this.nsp.name, room))
       } catch (error) {
@@ -177,29 +210,20 @@ export class AMQPAdapter extends Adapter {
           debug('addAll failed', error)
         }
       }
-
-      return true
     })
-
-    if (callback) {
-      await promises.then(() => callback()).catch(callback)
-    }
-
-    await promises
   }
 
   /**
    * Unsubscribe client from room messages.
-   *
-   * @param {String} id
-   * @param {String} room
+   * @param id
+   * @param room
    */
-  async del(id: string, room: string, callback?: () => void): Promise<void> {
+  async del(id: string, room: string): Promise<void> {
     debug('#%s: removing %s from %s', this.transport.serverId, id, room)
-    const hasRoom = this.rooms[room] !== undefined
+    const hasRoom = this.rooms.has(room)
     super.del(id, room)
 
-    if (hasRoom && !this.rooms[room]) {
+    if (hasRoom && !this.rooms.has(room)) {
       try {
         await this.transport.unbindRoutingKey(Transport.makeRoutingKey(this.nsp.name, room))
       } catch (error) {
@@ -210,24 +234,21 @@ export class AMQPAdapter extends Adapter {
         }
       }
     }
-
-    if (callback) setImmediate(callback)
   }
 
   /**
    * Unsubscribe client completely
-   *
-   * @param {String} id
+   * @param id
    */
-  async delAll(id: string, callback?: () => void): Promise<void> {
+  async delAll(id: string): Promise<void> {
     debug('#%s: removing %s from all rooms', this.transport.serverId, id)
 
-    const rooms = this.sids[id]
+    const rooms = this.sids.get(id)
 
     if (rooms) {
       try {
-        await Bluebird.map(Object.keys(rooms), (room) => this.del(id, room))
-        delete this.sids[id]
+        await Bluebird.map(rooms, (room) => this.del(id, room))
+        this.sids.delete(id)
       } catch (error) {
         if (this.listenerCount('error')) {
           this.emit('error', error)
@@ -236,8 +257,6 @@ export class AMQPAdapter extends Adapter {
         }
       }
     }
-
-    if (callback) setImmediate(callback)
   }
 }
 

@@ -1,25 +1,26 @@
 import { merge } from 'lodash'
-import AMQPTransport = require('@microfleet/transport-amqp');
-import _debug = require('debug');
-import Errors = require('common-errors');
-import is = require('is');
-import uid2 = require('uid2');
-import Adapter = require('socket.io-adapter');
+import AMQPTransport = require('@microfleet/transport-amqp')
+import _debug = require('debug')
+import Errors = require('common-errors')
+import is from '@sindresorhus/is'
+import uid2 = require('uid2')
 import { EventEmitter, once } from 'events'
-import type { Message } from 'socket.io'
+import type { EncodedMessage, Message } from 'socket.io'
+import type { AMQPAdapter } from './adapter'
 
 const debug = _debug('socket.io-adapter-amqp:transport')
 
-const kQueueBound = Symbol('queue-bound')
-const kExchangeCreated = Symbol('exchange-created')
+const kQueueBound = Symbol.for('socket.io:adapter:queue-bound')
+const kExchangeCreated = Symbol.for('socket.io:adapter:exchange-created')
 
 /**
  *
  */
-class Transport extends EventEmitter {
-  public adapters: Map<string, typeof Adapter> = new Map();
+export class Transport extends EventEmitter {
+  public adapters: Map<string, AMQPAdapter> = new Map();
   public serverId = uid2(6);
   public transport: AMQPTransport;
+  public connecting = false;
 
   private exchangeCreated = false;
   private queue: any = null;
@@ -46,7 +47,7 @@ class Transport extends EventEmitter {
   /**
    * @param {Object} options
    */
-  constructor(options = {}) {
+  constructor(options: any = {}) {
     super()
     this.transport = new AMQPTransport(merge({}, options, Transport.essentialOptions))
     this.router = this.router.bind(this)
@@ -59,6 +60,7 @@ class Transport extends EventEmitter {
   }
 
   async connect(): Promise<void> {
+    this.connecting = true
     await this.transport.connect()
     await this.transport.createConsumedQueue(this.router)
 
@@ -67,6 +69,7 @@ class Transport extends EventEmitter {
 
   async close(): Promise<void> {
     debug('closing')
+    this.connecting = false
     await this.transport.closeAllConsumers()
     await this.transport.close()
   }
@@ -75,15 +78,15 @@ class Transport extends EventEmitter {
    * @param message
    * @param {Object} headers
    */
-  async router(message: Message, headers: Record<string, string>): Promise<boolean> {
+  async router(message: Message, headers: Record<string, string>): Promise<void> {
     const { routingKey } = headers
     // expected that routingKey should be following pattern {namespace}.[{room}]
     const routingParts = routingKey.split(Transport.ROUTING_KEY_DELIMITER)
-    debug('#%s: get message for', this.serverId, routingKey)
+    debug('#%s: get message for %s - %j', this.serverId, routingKey, message)
 
     if (routingParts.length < 1) {
       debug('#%s: invalid routing key %s', this.serverId, routingKey)
-      return false
+      return
     }
 
     const [namespaceName] = routingParts
@@ -91,7 +94,7 @@ class Transport extends EventEmitter {
 
     if (is.undefined(adapter)) {
       debug('#%s: invalid adapter for routing key %s', this.serverId, routingKey)
-      return true
+      return
     }
 
     return adapter.processMessage(routingKey, message)
@@ -104,7 +107,8 @@ class Transport extends EventEmitter {
   async bindRoutingKey(routingKey: string): Promise<boolean> {
     if (this.queue === null) {
       debug(
-        '#%s: trying to bind routing key %s, but queue is not ready yet',
+        '[connecting: %s] #%s: trying to bind routing key %s, but queue is not ready yet',
+        this.connecting,
         this.serverId,
         routingKey
       )
@@ -144,7 +148,7 @@ class Transport extends EventEmitter {
    * @param message
    * @returns {Promise}
    */
-  async publish(routingKey: string, message: Message): Promise<boolean> {
+  async publish(routingKey: string, message: EncodedMessage): Promise<boolean> {
     if (this.exchangeCreated === false) {
       debug(
         '#%s: trying to publish to %s, but exchange is not ready yet',

@@ -13,7 +13,7 @@ declare module '@microfleet/transport-amqp' {
     connect(): Promise<AMQPTransport>;
     close(): Promise<void>;
 
-    createConsumedQueue(router: (message: Message, headers: Record<string, string>) => Promise<boolean>): Promise<void>;
+    createConsumedQueue(router: (message: Message, headers: Record<string, string>) => Promise<void>): Promise<void>;
     closeAllConsumers(): Promise<void>;
     bindExchange(queue: any, key: string): Promise<void>;
     unbindExchange(queue: any, key: string): Promise<void>;
@@ -23,5 +23,3 @@ declare module '@microfleet/transport-amqp' {
     static connect(config: any): Promise<AMQPTransport>;
   }
 }
-
-declare module 'socket.io-adapter';

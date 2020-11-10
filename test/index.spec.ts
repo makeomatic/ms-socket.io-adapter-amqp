@@ -3,17 +3,18 @@ import { Server as HttpServer } from 'http'
 import { AddressInfo } from 'net'
 import _debug = require('debug')
 import { expect } from 'chai'
-import Transport from '../src/transport'
-import AdapterFactory from '../src'
-import SocketIO = require('socket.io')
-import SocketIOClient = require('socket.io-client')
+import { Transport } from '../src/transport'
+import { AdapterFactory } from '../src'
+import { Server as SocketIO, Socket as ServerSocket } from 'socket.io'
+import { io as SocketIOClient, Socket as ClientSocket } from 'socket.io-client'
 import Bluebird = require('bluebird')
+import { once } from 'events'
 
 const debug = _debug('socket.io-adapter-amqp:test')
 
 describe('socket.io-adapter-amqp', function suite() {
-  let poolToClose: (HttpServer | SocketIO.Server)[] = []
-  let sockets: (SocketIOClient.Socket | SocketIO.Socket)[] = []
+  let poolToClose: (HttpServer | SocketIO)[] = []
+  let sockets: (ServerSocket | ClientSocket)[] = []
 
   afterEach(async () => {
     sockets.map(socket => socket.disconnect())
@@ -28,36 +29,38 @@ describe('socket.io-adapter-amqp', function suite() {
    * Create a pair of socket.io server+client
    * @param {String} namespace
    */
-  async function create(namespace = '/chat'): Promise<[SocketIOClient.Socket, SocketIO.Socket]> {
+  async function create(namespace = '/chat'): Promise<[ClientSocket, ServerSocket]> {
     const server = new HttpServer()
-    const socketIO = SocketIO(server)
+    const socketIO = new SocketIO(server)
     const adapter = AdapterFactory.fromOptions()
 
     socketIO.adapter(adapter)
+    poolToClose.push(socketIO, server)
+    server.listen()
 
-    return new Promise((resolve, reject) => {
-      poolToClose.push(socketIO, server)
-      server.once('error', reject)
-      server.listen(() => {
-        server.removeListener('error', reject)
+    await once(server, 'listening')
 
-        const address = server.address() as AddressInfo
-        const url = `http://localhost:${address.port}${namespace}`
+    const address = server.address() as AddressInfo
+    const url = `http://localhost:${address.port}${namespace}`
 
-        debug('listening on %s', url)
+    debug('listening on %s', url)
 
-        const serverNamespace = socketIO.of(namespace)
-        const socket = SocketIOClient(url)
+    const serverNamespace = socketIO.of(namespace)
+    const socket = SocketIOClient(url)
+    sockets.push(socket)
 
-        serverNamespace.once('connection', (serverSocket: SocketIO.Socket) => {
-          sockets.push(socket, serverSocket)
-          resolve([socket, serverSocket])
-        })
-      })
-    })
+    const [[serverSocket]] = await Promise.all([
+      once(serverNamespace, 'connection'),
+      once(socket, 'connect')
+    ])
+
+    // to ensure that socket was able to connect to the amqp room
+    await Bluebird.delay(1000)
+
+    return [socket, serverSocket]
   }
 
-  async function openConnections(n: number): Promise<[SocketIOClient.Socket, SocketIO.Socket][]> {
+  async function openConnections(n: number): Promise<[ClientSocket, ServerSocket][]> {
     const promises = []
     for (let i = 0; i < n; i += 1) {
       promises.push(create())
@@ -108,7 +111,7 @@ describe('socket.io-adapter-amqp', function suite() {
       const [client3] = c3
 
       debug('join?')
-      await new Promise(resolve => serverClient1.join('woot', resolve))
+      serverClient1.join('woot')
       debug('joined')
 
       serverClient2.on('do broadcast', () => {
@@ -156,14 +159,13 @@ describe('socket.io-adapter-amqp', function suite() {
           serverClient2.broadcast.to('woot').emit('broadcast')
         })
 
-        serverClient3.join('woot', () => {
-          client3.on('broadcast', async () => {
-            await Bluebird.delay(500)
-            resolve()
-          })
-
-          client2.emit('do broadcast')
+        serverClient3.join('woot')
+        client3.on('broadcast', async () => {
+          await Bluebird.delay(500)
+          resolve()
         })
+
+        client2.emit('do broadcast')
       })
 
       await promise
@@ -181,8 +183,10 @@ describe('socket.io-adapter-amqp', function suite() {
           // needs to unbind listeners, not instant
           await new Promise(resolve => setTimeout(resolve, 50))
 
-          expect(serverClient.adapter.sids[serverClient.id]).to.be.undefined
-          expect(serverClient.adapter.rooms).to.be.empty
+          // @ts-expect-error -- testing private properties
+          expect(serverClient.adapter.sids.get(serverClient.id)).to.be.undefined
+          // @ts-expect-error -- testing room size
+          expect(serverClient.adapter.rooms.size).to.be.equal(0)
           resolve()
         })
 

@@ -1,39 +1,26 @@
-import Errors = require('common-errors');
-import is = require('is');
-import AMQPAdapter from './adapter'
-import Transport from './transport'
+import Errors = require('common-errors')
+import is from '@sindresorhus/is'
+import { AMQPAdapter } from './adapter'
+import { Transport } from './transport'
 import type { Namespace } from 'socket.io'
 
 /**
- *
+ * Adapter Factory
  */
-class AdapterFactory {
-  /**
-   * @param options
-   * @returns {AdapterFactory}
-   */
-  static fromOptions(options = {}): AdapterFactory {
-    if (is.object(options) === false) {
-      throw new Errors.ArgumentError('options')
-    }
+export const AdapterFactory = (transport: Transport) => function factory(namespace: Namespace): AMQPAdapter {
+  return new AMQPAdapter(namespace, transport)
+}
 
-    const transport = new Transport(options)
-    return new AdapterFactory(transport)
+/**
+ * @param options
+ */
+AdapterFactory.fromOptions = (options: any = {}) => {
+  if (is.object(options) === false) {
+    throw new Errors.ArgumentError('options')
   }
 
-  /**
-   * @param transport
-   * @returns {AdapterFactory.fromOptions}
-   */
-  constructor(transport: Transport) {
-    if (transport instanceof Transport === false) {
-      throw new Errors.ArgumentError('transport')
-    }
-
-    return function factory(namespace: Namespace) {
-      return new AMQPAdapter(namespace, transport)
-    }
-  }
+  const transport = new Transport(options)
+  return AdapterFactory(transport)
 }
 
 export default AdapterFactory
