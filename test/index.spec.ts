@@ -34,6 +34,7 @@ describe('socket.io-adapter-amqp', function suite() {
     const socketIO = new SocketIO(server)
     const adapter = AdapterFactory.fromOptions()
 
+    // @ts-expect-error invalid type
     socketIO.adapter(adapter)
     poolToClose.push(socketIO, server)
     server.listen()
@@ -87,7 +88,7 @@ describe('socket.io-adapter-amqp', function suite() {
       const [client1] = c1
       const [client2, serverClient2] = c2
 
-      const promise = new Promise((resolve, reject) => {
+      const promise = new Promise<void>((resolve, reject) => {
         client1.once('woot', (a: any[], b: any) => {
           expect(a).to.eql([])
           expect(b).to.eql({ a: 'b' })
@@ -111,14 +112,15 @@ describe('socket.io-adapter-amqp', function suite() {
       const [client3] = c3
 
       debug('join?')
-      serverClient1.join('woot')
+      await serverClient1.join('woot')
       debug('joined')
 
       serverClient2.on('do broadcast', () => {
+        debug('calling broadcast to woot')
         serverClient2.broadcast.to('woot').emit('broadcast')
       })
 
-      const promise = new Promise((resolve, reject) => {
+      const promise = new Promise<void>((resolve, reject) => {
         client2.on('broadcast', () => {
           reject(new Error('Not in room'))
         })
@@ -146,10 +148,10 @@ describe('socket.io-adapter-amqp', function suite() {
       const [client2, serverClient2] = c2
       const [client3, serverClient3] = c3
 
-      serverClient1.join('woot')
-      serverClient1.leave('woot')
+      await serverClient1.join('woot')
+      await serverClient1.leave('woot')
 
-      const promise = await new Promise((resolve, reject) => {
+      const promise = new Promise<void>((resolve, reject) => {
         client1.on('broadcast', () => {
           reject(new Error('Not in room'))
         })
@@ -159,24 +161,23 @@ describe('socket.io-adapter-amqp', function suite() {
           serverClient2.broadcast.to('woot').emit('broadcast')
         })
 
-        serverClient3.join('woot')
         client3.on('broadcast', async () => {
           await Bluebird.delay(500)
           resolve()
         })
-
-        client2.emit('do broadcast')
       })
 
+      await serverClient3.join('woot')
+      client2.emit('do broadcast')
       await promise
     })
 
     it('deletes rooms upon disconnection', async () => {
       const [[, serverClient]] = await openConnections(1)
 
-      serverClient.join('woot')
+      await serverClient.join('woot')
 
-      const promise = new Promise((resolve) => {
+      const promise = new Promise<void>((resolve) => {
         // delay is needed because delete happens in async fashion
         // and takes a few ticks
         serverClient.on('disconnect', async () => {

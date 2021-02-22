@@ -198,8 +198,7 @@ export class AMQPAdapter extends Adapter {
    */
   async addAll(id: string, rooms: Set<string>): Promise<void> {
     debug('#%s: adding %s to %s ', this.transport.serverId, id, rooms)
-    super.addAll(id, rooms)
-
+    await super.addAll(id, rooms)
     await Bluebird.map(rooms, async (room) => {
       try {
         await this.transport.bindRoutingKey(Transport.makeRoutingKey(this.nsp.name, room))
@@ -221,7 +220,7 @@ export class AMQPAdapter extends Adapter {
   async del(id: string, room: string): Promise<void> {
     debug('#%s: removing %s from %s', this.transport.serverId, id, room)
     const hasRoom = this.rooms.has(room)
-    super.del(id, room)
+    await super.del(id, room)
 
     if (hasRoom && !this.rooms.has(room)) {
       try {

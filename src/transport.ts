@@ -19,7 +19,7 @@ const kExchangeCreated = Symbol.for('socket.io:adapter:exchange-created')
 export class Transport extends EventEmitter {
   public adapters: Map<string, AMQPAdapter> = new Map();
   public serverId = uid2(6);
-  public transport: AMQPTransport;
+  public transport: InstanceType<typeof AMQPTransport>;
   public connecting = false;
 
   private exchangeCreated = false;
@@ -160,6 +160,7 @@ export class Transport extends EventEmitter {
     }
 
     debug('publishing to %s', routingKey)
+    // @ts-expect-error -- 3rd and 4th arguments are optional
     await this.transport.publish(routingKey, message)
     debug('#%s: publish to %s', this.serverId, routingKey)
     return true
