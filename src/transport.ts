@@ -160,7 +160,6 @@ export class Transport extends EventEmitter {
     }
 
     debug('publishing to %s', routingKey)
-    // @ts-expect-error -- 3rd and 4th arguments are optional
     await this.transport.publish(routingKey, message)
     debug('#%s: publish to %s', this.serverId, routingKey)
     return true
