@@ -26,6 +26,12 @@ const broadcastOptsProto = Object.create({}, {
   }
 })
 
+declare module 'http' {
+  interface Server {
+    [prop: symbol]: boolean
+  }
+}
+
 /**
  *
  */
@@ -39,6 +45,8 @@ export class AMQPAdapter extends Adapter {
    * @param transport
    */
   constructor(namespace: Namespace, transport: Transport) {
+    debug('creating AMQPAdapter on %s using %s', namespace.name, transport.serverId)
+
     if (transport instanceof Transport === false) {
       throw new Errors.ArgumentError('transport')
     }
@@ -48,6 +56,8 @@ export class AMQPAdapter extends Adapter {
     this.namespace = namespace
     this.transport = transport
     this.routingKey = Transport.makeRoutingKey(namespace.name)
+
+    debug('binding %s', this.routingKey)
 
     transport.bindRoutingKey(this.routingKey)
     transport.adapters.set(namespace.name, this)
@@ -62,22 +72,24 @@ export class AMQPAdapter extends Adapter {
     // @ts-expect-error - must access private property to attach
     //  to error listeners
     const httpServer = server.httpServer as httpServer
-    if (httpServer) {
+    const connectionSymbol = Symbol.for(`@microfleet/socket.io-adapter::${this.transport.serverId}`)
+
+    if (httpServer && !httpServer[connectionSymbol]) {
+      httpServer.once('close', this.onClose.bind(this))
+      httpServer[connectionSymbol] = true
+
       if (httpServer.listening) {
         this.onListen()
+      } else {
+        httpServer.once('listening', this.onListen.bind(this))
       }
-
-      httpServer.once('close', this.onClose.bind(this))
-      httpServer.once('listening', this.onListen.bind(this))
     }
   }
 
   private async onListen(): Promise<void> {
     try {
-      // eslint-disable-next-line no-console
-      console.trace('onListen called')
       await this.transport.connect()
-    } catch (e) {
+    } catch (e: any) {
       debug('failed to connect to amqp transport', e.message)
     }
   }
@@ -85,7 +97,7 @@ export class AMQPAdapter extends Adapter {
   private async onClose(): Promise<void> {
     try {
       await this.transport.close()
-    } catch (e) {
+    } catch (e: any) {
       debug('failed to close connection to amqp transport', e.message)
     }
   }

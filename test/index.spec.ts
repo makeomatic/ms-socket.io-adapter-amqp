@@ -27,14 +27,13 @@ describe('socket.io-adapter-amqp', function suite() {
 
   /**
    * Create a pair of socket.io server+client
-   * @param {String} namespace
+   * @param namespace
    */
   async function create(namespace = '/chat'): Promise<[ClientSocket, ServerSocket]> {
     const server = new HttpServer()
     const socketIO = new SocketIO(server)
     const adapter = AdapterFactory.fromOptions()
 
-    // @ts-expect-error invalid type
     socketIO.adapter(adapter)
     poolToClose.push(socketIO, server)
     server.listen()
