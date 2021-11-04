@@ -16,6 +16,7 @@
     "noImplicitReturns": true,
     "noFallthroughCasesInSwitch": true,
     "esModuleInterop": true,
+    "skipLibCheck": false,
     "typeRoots": [
       "./node_modules/@types",
       "./src/typings"
