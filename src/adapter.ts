@@ -3,9 +3,10 @@ import _debug = require('debug')
 import Errors = require('common-errors')
 import Bluebird = require('bluebird')
 import { Transport } from './transport'
-import type { Server as httpServer } from 'http'
+import type { Server as HttpServer } from 'http'
 import type { Namespace, Message, Packet, EncodedMessage, EncodeOptions } from 'socket.io'
 
+const kHttpServer = Symbol.for('socket.io:namespace:http-server')
 const debug = _debug('socket.io-adapter-amqp:adapter')
 
 const broadcastOptsProto = Object.create({}, {
@@ -32,6 +33,12 @@ declare module 'http' {
   }
 }
 
+declare module 'socket.io' {
+  interface Server {
+    [kHttpServer]: HttpServer
+  }
+}
+
 /**
  *
  */
@@ -51,42 +58,59 @@ export class AMQPAdapter extends Adapter {
       throw new Errors.ArgumentError('transport')
     }
 
+    const { server } = namespace
+    // @ts-expect-error Property 'httpServer' is private and only accessible within class
+    const { httpServer: httpServerValue } = server // should reinitialize if http server was set
+    // there is no other way to set up connection listeners
+    Object.defineProperty(server, 'httpServer', {
+      configurable: true,
+      enumerable: true,
+      get: () => server[kHttpServer],
+      set: (newValue: HttpServer) => {
+        const httpServer = server[kHttpServer] = newValue
+
+        if (httpServer) {
+          this.setupConnectionListeners(httpServer)
+        }
+      }
+    })
+
     super(namespace)
 
     this.namespace = namespace
     this.transport = transport
     this.routingKey = Transport.makeRoutingKey(namespace.name)
 
+    // init connection listener if http server was set
+    if (httpServerValue) {
+      // @ts-expect-error Property 'httpServer' is private and only accessible within class
+      server.httpServer = httpServerValue
+    }
+
     debug('binding %s', this.routingKey)
 
     transport.bindRoutingKey(this.routingKey)
     transport.adapters.set(namespace.name, this)
-    debug('#%s: namespace %s was created', transport.serverId, namespace.name)
 
-    this.setupConnectionListeners()
+    debug('#%s: namespace %s was created', transport.serverId, namespace.name)
   }
 
-  private setupConnectionListeners(): void {
-    const { namespace: { server } } = this
-
-    // @ts-expect-error - must access private property to attach
-    //  to error listeners
-    const httpServer = server.httpServer as httpServer
+  private setupConnectionListeners(httpServer: HttpServer): void {
     const connectionSymbol = Symbol.for(`@microfleet/socket.io-adapter::${this.transport.serverId}`)
 
     if (httpServer && !httpServer[connectionSymbol]) {
-      httpServer.once('close', this.onClose.bind(this))
+      httpServer.once('close', this.close.bind(this))
       httpServer[connectionSymbol] = true
 
       if (httpServer.listening) {
-        this.onListen()
+        this.init()
       } else {
-        httpServer.once('listening', this.onListen.bind(this))
+        httpServer.once('listening', this.init.bind(this))
       }
     }
   }
 
-  private async onListen(): Promise<void> {
+  public async init(): Promise<void> {
     try {
       await this.transport.connect()
     } catch (e: any) {
@@ -94,7 +118,7 @@ export class AMQPAdapter extends Adapter {
     }
   }
 
-  private async onClose(): Promise<void> {
+  public async close(): Promise<void> {
     try {
       await this.transport.close()
     } catch (e: any) {
