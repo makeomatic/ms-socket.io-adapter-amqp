@@ -4,9 +4,13 @@ import Errors = require('common-errors')
 import Bluebird = require('bluebird')
 import { Transport } from './transport'
 import type { Server as HttpServer } from 'http'
-import type { Namespace, Message, Packet, EncodedMessage, EncodeOptions } from 'socket.io'
+import type {
+  Server as SocketioServer, Namespace, Message,
+  Packet, EncodedMessage, EncodeOptions,
+} from 'socket.io'
 
 const kHttpServer = Symbol.for('socket.io:namespace:http-server')
+const httpServerProperty = 'httpServer'
 const debug = _debug('socket.io-adapter-amqp:adapter')
 
 const broadcastOptsProto = Object.create({}, {
@@ -61,21 +65,11 @@ export class AMQPAdapter extends Adapter {
     const { server } = namespace
     // @ts-expect-error Property 'httpServer' is private and only accessible within class
     const { httpServer: httpServerValue } = server // should reinitialize if http server was set
-    // there is no other way to set up connection listeners
-    Object.defineProperty(server, 'httpServer', {
-      configurable: true,
-      enumerable: true,
-      get: () => server[kHttpServer],
-      set: (newValue: HttpServer) => {
-        const httpServer = server[kHttpServer] = newValue
-
-        if (httpServer) {
-          this.setupConnectionListeners(httpServer)
-        }
-      }
-    })
 
     super(namespace)
+
+    // there is no other way to set up connection listeners
+    this.initConnectionListeners(server)
 
     this.namespace = namespace
     this.transport = transport
@@ -93,6 +87,27 @@ export class AMQPAdapter extends Adapter {
     transport.adapters.set(namespace.name, this)
 
     debug('#%s: namespace %s was created', transport.serverId, namespace.name)
+  }
+
+  private initConnectionListeners(server: SocketioServer): void {
+    const property = Object.getOwnPropertyDescriptor(server, httpServerProperty)
+
+    if (property?.set !== undefined) {
+      return
+    }
+
+    Object.defineProperty(server, httpServerProperty, {
+      configurable: true,
+      enumerable: true,
+      get: () => server[kHttpServer],
+      set: (newValue: HttpServer) => {
+        const httpServer = server[kHttpServer] = newValue
+
+        if (httpServer) {
+          this.setupConnectionListeners(httpServer)
+        }
+      }
+    })
   }
 
   private setupConnectionListeners(httpServer: HttpServer): void {
