@@ -38,6 +38,7 @@ Options that has no effect:
 ## Changelog
 
 - Initial Release: 01.07.2016
+- ---
 
 ## License
 
