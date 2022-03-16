@@ -1,7 +1,7 @@
 {
   "compilerOptions": {
     "outDir": "lib",
-    "target": "es2019",
+    "target": "esnext",
     "module": "commonjs",
     "moduleResolution": "node",
     "declaration": true,
